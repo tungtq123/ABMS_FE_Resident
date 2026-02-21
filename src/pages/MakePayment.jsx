@@ -31,6 +31,7 @@ export default function MakePayment() {
       try {
         // const billData = await fetchBillDetail(billId);
         const paymentData = await createPayment(billId);
+        console.log(paymentData);
         setBill(paymentData.result);
         setPayment(paymentData.result);
       } catch (err) {
@@ -103,7 +104,7 @@ export default function MakePayment() {
         {/* Left Column */}
         <div className="space-y-6">
           <BillInfoCard bill={bill} />
-          <AmountCard totalAmount={bill?.totalAmount} />
+          <AmountCard amount={bill?.amount} />
           <ChargeDetailCard items={bill?.items} />
         </div>
 

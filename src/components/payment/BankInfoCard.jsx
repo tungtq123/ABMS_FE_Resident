@@ -10,19 +10,19 @@ export default function BankInfoCard({ bill }) {
       <div className="space-y-2 text-sm">
         <div className="flex justify-between">
           <span className="text-gray-500">Ngân hàng</span>
-          <span className="font-semibold text-gray-900">Vietcombank</span>
+          <span className="font-semibold text-gray-900">MB Bank</span>
         </div>
         <div className="flex justify-between">
           <span className="text-gray-500">Số tài khoản</span>
-          <span className="font-semibold text-gray-900">1234567890</span>
+          <span className="font-semibold text-gray-900">0969064150</span>
         </div>
         <div className="flex justify-between">
           <span className="text-gray-500">Chủ tài khoản</span>
-          <span className="font-semibold text-gray-900 text-right">CTY TNHH QUẢN LÝ TÒA NHÀ ABC</span>
+          <span className="font-semibold text-gray-900 text-right">TO QUOC TUNG</span>
         </div>
         <div className="flex justify-between">
           <span className="text-gray-500">Nội dung CK</span>
-          <span className="font-semibold text-gray-900">{bill?.id}</span>
+          <span className="font-semibold text-gray-900">{bill?.billId}</span>
         </div>
       </div>
     </div>
