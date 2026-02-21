@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { useParams, useNavigate } from "react-router-dom";
-import { fetchBillDetail, createPayment } from "../services/apiService";
+import {  createPayment } from "../services/apiService";
 import BillInfoCard from "../components/payment/BillInfoCard";
 import AmountCard from "../components/payment/AmountCard";
 import ChargeDetailCard from "../components/payment/ChargeDetailCard";
@@ -29,10 +29,10 @@ export default function MakePayment() {
   useEffect(() => {
     const init = async () => {
       try {
-        const billData = await fetchBillDetail(billId);
+        // const billData = await fetchBillDetail(billId);
         const paymentData = await createPayment(billId);
-        setBill(billData);
-        setPayment(paymentData);
+        setBill(paymentData.result);
+        setPayment(paymentData.result);
       } catch (err) {
         console.error(err);
       } finally {

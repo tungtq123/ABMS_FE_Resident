@@ -1,12 +1,12 @@
-const BASE_URL = "http://localhost:8080/api";
+const BASE_URL = "http://localhost:8080/building-management/api";
 
-export const fetchBillDetail = async (billId) => {
-  const res = await fetch(`${BASE_URL}/bills/${billId}`);
-  return await res.json();
-};
+// export const fetchBillDetail = async (billId) => {
+//   const res = await fetch(`${BASE_URL}/payment/${billId}`);
+//   return await res.json();
+// };
 
 export const createPayment = async (billId) => {
-  const res = await fetch(`${BASE_URL}/bills/${billId}/payment`, {
+  const res = await fetch(`${BASE_URL}/payment/${billId}`, {
     method: "POST",
   });
   return await res.json();
