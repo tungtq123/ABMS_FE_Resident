@@ -1,17 +1,19 @@
 import { createBrowserRouter, Navigate } from "react-router-dom";
 
 
-import MainLayout from "../layouts/MainLayout";
 import MakePayment from "../pages/MakePayment";
 import BillList from "../pages/BillList";
 import Dashboard from "../pages/Dashboard";
+import BuildingList from "../components/building/BuildingList";
+import ResidentLayout from "../layouts/ResidentLayout";
+import ManagerLayout from "../layouts/ManagerLayout";
 
 const AppRoutes = createBrowserRouter([
 
   /* ================= PAYMENT (RESIDENT) ================= */
   {
     path: "/",
-    element: <MainLayout />,
+    element: <ResidentLayout />,
     children: [
       {
         path: "payment/:billId",
@@ -25,6 +27,16 @@ const AppRoutes = createBrowserRouter([
         path: "dashboard",
         element: <Dashboard />,
       },
+    ],
+  },
+    {
+    path: "/",
+    element: <ManagerLayout />,
+    children: [
+      {
+        path: "building",
+        element: <BuildingList />,
+      }
     ],
   },
 ]);
