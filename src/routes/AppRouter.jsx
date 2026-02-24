@@ -4,10 +4,10 @@ import { createBrowserRouter, Navigate } from "react-router-dom";
 import MakePayment from "../pages/MakePayment";
 import BillList from "../pages/BillList";
 import Dashboard from "../pages/Dashboard";
-import BuildingList from "../components/building/BuildingList";
+import BuildingList from "../pages/building/BuildingList";
 import ResidentLayout from "../layouts/ResidentLayout";
 import ManagerLayout from "../layouts/ManagerLayout";
-
+import AddBuilding from "../pages/building/AddBuilding";
 const AppRoutes = createBrowserRouter([
 
   /* ================= PAYMENT (RESIDENT) ================= */
@@ -36,7 +36,12 @@ const AppRoutes = createBrowserRouter([
       {
         path: "building",
         element: <BuildingList />,
+      },
+            {
+        path: "add-building",
+        element: <AddBuilding />,
       }
+      
     ],
   },
 ]);
