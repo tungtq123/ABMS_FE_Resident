@@ -4,6 +4,8 @@ import { RouterProvider } from "react-router-dom";
 import AppRoutes from "./routes/AppRouter";
 import "./index.css";
 
+window.global = window;
+
 ReactDOM.createRoot(document.getElementById("root")).render(
   // <React.StrictMode>
     <RouterProvider router={AppRoutes} />
