@@ -44,6 +44,8 @@ export default function BuildingList() {
     setShowModal(true);
   };
 
+
+  
   const handleGenerate = async (id) => {
     if (!window.confirm("Bắt đầu sinh căn hộ tự động cho tòa nhà này?")) return;
     const res = await generateApartments(id);
