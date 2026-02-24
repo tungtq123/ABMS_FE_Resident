@@ -35,8 +35,8 @@ export default function CreateMaintenanceRequest() {
     priority: 'NORMAL',
     preferredTime: '',
     isBillable: false,
-    apartmentId: 'uuid-apartment', // TODO: Get from context
-    buildingId: 'uuid-building',   // TODO: Get from context
+    apartmentId: '', // TODO: Get from context
+    buildingId: '1ba6cfce-0331-4179-883a-4da233de796e',   // TODO: Get from context
   });
 
   const [alertConfig, setAlertConfig] = useState({ isOpen: false, title: '', message: '', type: 'info' });
@@ -67,7 +67,12 @@ export default function CreateMaintenanceRequest() {
       //   return;
       // }
 
-      const response = await createMaintenanceRequest(formData);
+      const payload = { ...formData };
+      if (!payload.apartmentId) payload.apartmentId = null;
+      if (!payload.buildingId) payload.buildingId = null;
+      if (!payload.preferredTime) payload.preferredTime = null;
+
+      const response = await createMaintenanceRequest(payload);
       if (response.code === 200) {
         // Có thể redirect hoặc thông báo tạo thành công trước khi redirect
         navigate(`/maintenance/${response.result.id}`);
