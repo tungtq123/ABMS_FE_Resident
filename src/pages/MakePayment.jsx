@@ -31,7 +31,7 @@ export default function MakePayment() {
       try {
         const billData = await fetchBillDetail(billId);
         const paymentData = await createPayment(billId);
-        setBill(billData);
+        setBill(billData.result);
         setPayment(paymentData);
       } catch (err) {
         console.error(err);
