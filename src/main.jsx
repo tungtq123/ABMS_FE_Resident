@@ -4,10 +4,12 @@ import { RouterProvider } from "react-router-dom";
 import AppRoutes from "./routes/AppRouter";
 import "./index.css";
 
-window.global = window;
+import ErrorBoundary from "./components/common/ErrorBoundary";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   // <React.StrictMode>
+  <ErrorBoundary>
     <RouterProvider router={AppRoutes} />
+  </ErrorBoundary>
   // </React.StrictMode>
 );

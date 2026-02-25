@@ -86,7 +86,7 @@ export default function BuildingList() {
               onKeyDown={(e) => e.key === 'Enter' && setActiveSearch(searchInput)}
             />
           </div>
-          <button onClick={() => navigate('/buildings/add')} className="bg-blue-600 text-white p-2.5 rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-100">
+          <button onClick={() => navigate('/add-building')} className="bg-blue-600 text-white p-2.5 rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-100">
             <Plus size={20} />
           </button>
         </div>
