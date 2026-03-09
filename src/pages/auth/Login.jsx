@@ -1,12 +1,13 @@
 import React, { useState } from "react";
-import { Container, Form, Button } from "react-bootstrap";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { signIn } from "../../services/authApi";
 
 function Login() {
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+
   const { login } = useAuth();
   const navigate = useNavigate();
 
@@ -29,103 +30,89 @@ function Login() {
   };
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: "#f8f9fa"
-      }}
-    >
-      <Container>
-        <div
-          style={{
-            width: "100%",
-            maxWidth: "420px",
-            margin: "auto",
-            padding: "40px",
-            borderRadius: "12px",
-            background: "#fff",
-            border: "1px solid #f1f1f1",
-            boxShadow: "0 10px 35px rgba(0,0,0,0.08)"
-          }}
-        >
-          {/* Title */}
-          <div className="text-center mb-4">
-            <h3 style={{ fontWeight: "600" }}>Đăng nhập</h3>
-            <p style={{ fontSize: "14px", color: "#6c757d" }}>
-              Vui lòng đăng nhập để tiếp tục
-            </p>
-          </div>
+    <div className="min-h-screen flex">
 
-          <Form onSubmit={handleSubmit}>
-            {/* Email */}
-            <Form.Group className="mb-3">
-              <Form.Label style={{ fontWeight: "500" }}>Email</Form.Label>
-              <Form.Control
+      {/* LEFT LOGIN */}
+      <div className="flex flex-col justify-center w-full lg:w-1/2 px-10">
+
+        {/* Logo */}
+        <div className="flex items-center mb-10">
+          <span className="text-3xl font-bold">Logo</span>
+        </div>
+
+        {/* Form */}
+        <div className="max-w-md">
+
+          <h2 className="text-2xl font-semibold mb-6">
+            Log in
+          </h2>
+
+          <form onSubmit={handleSubmit} className="space-y-5">
+
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                Email
+              </label>
+
+              <input
                 type="email"
-                placeholder="Nhập email"
+                placeholder="Enter email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                style={{
-                  padding: "10px",
-                  borderRadius: "6px"
-                }}
+                className="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
               />
-            </Form.Group>
+            </div>
 
-            {/* Password */}
-            <Form.Group className="mb-4">
-              <Form.Label style={{ fontWeight: "500" }}>Mật khẩu</Form.Label>
-              <Form.Control
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                Password
+              </label>
+
+              <input
                 type="password"
-                placeholder="Nhập mật khẩu"
+                placeholder="Enter password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                style={{
-                  padding: "10px",
-                  borderRadius: "6px"
-                }}
+                className="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
               />
-            </Form.Group>
-
-            {/* Button */}
-            <Button
-              type="submit"
-              className="w-100"
-              style={{
-                padding: "10px",
-                fontWeight: "500",
-                borderRadius: "6px",
-                backgroundColor: "#212529",
-                borderColor: "#212529",
-                transition: "all 0.2s"
-              }}
-              onMouseOver={(e) => (e.target.style.backgroundColor = "#000")}
-              onMouseOut={(e) => (e.target.style.backgroundColor = "#212529")}
-            >
-              Đăng nhập
-            </Button>
-
-            {/* Register */}
-            <div className="text-center mt-3">
-              <small style={{ color: "#6c757d" }}>
-                Bạn chưa có tài khoản?{" "}
-                <Link
-                  to="/register"
-                  style={{
-                    textDecoration: "none",
-                    fontWeight: "500"
-                  }}
-                >
-                  Đăng ký
-                </Link>
-              </small>
             </div>
-          </Form>
+
+            <button
+              type="submit"
+              className="w-full bg-black text-white py-2 rounded-lg hover:bg-gray-800 transition"
+            >
+              Login
+            </button>
+
+          </form>
+
+          <p className="text-sm text-gray-500 mt-4">
+            Forgot password?
+          </p>
+
+          <p className="mt-6 text-sm">
+            Don't have an account?{" "}
+            <Link
+              to="/register"
+              className="text-blue-500 font-medium hover:underline"
+            >
+              Register here
+            </Link>
+          </p>
+
         </div>
-      </Container>
+
+      </div>
+
+      {/* RIGHT IMAGE */}
+      <div className="hidden lg:block w-1/2">
+        <img
+          src="https://mdbcdn.b-cdn.net/img/Photos/new-templates/bootstrap-login-form/img3.webp"
+          alt="login"
+          className="h-screen w-full object-cover"
+        />
+      </div>
+
     </div>
   );
 }
