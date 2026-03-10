@@ -1,92 +1,51 @@
 const BASE_URL = "http://localhost:8080/building-management/api";
 
-export const fetchBuildings = async (page = 0, size = 10, search = "") => {
-  const params = new URLSearchParams({
-    page,
-    size,
-    ...(search && { search }),
+const getHeaders = (token) => ({
+  "Content-Type": "application/json",
+  "Authorization": `Bearer ${token}`,
+});
+
+export const fetchBuildings = async (page = 0, size = 10, search = "", status = "", token) => {
+  const params = new URLSearchParams({ page, size });
+  if (search) params.append("search", search);
+  if (status !== "") params.append("apartmentsGenerated", status);
+
+  const res = await fetch(`${BASE_URL}/buildings?${params.toString()}`, {
+    method: "GET",
+    headers: getHeaders(token),
   });
-
-  const res = await fetch(`${BASE_URL}/buildings?${params}`);
   return await res.json();
 };
 
-
-export const fetchAllBuildings = async () => {
-  const res = await fetch(`${BASE_URL}/buildings/all`);
-  return await res.json();
-};
-
-
-export const fetchBuildingById = async (id) => {
-  const res = await fetch(`${BASE_URL}/buildings/${id}`);
-  return await res.json();
-};
-
-
-export const createBuilding = async (data) => {
-  const res = await fetch(`${BASE_URL}/buildings`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(data),
-  });
-
-  return await res.json();
-};
-
-
-export const updateBuilding = async (id, data) => {
-  const res = await fetch(`${BASE_URL}/buildings/${id}`, {
-    method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(data),
-  });
-
-  return await res.json();
-};
-
-
-export const deleteBuilding = async (id) => {
+export const deleteBuilding = async (id, token) => {
   const res = await fetch(`${BASE_URL}/buildings/${id}`, {
     method: "DELETE",
+    headers: getHeaders(token),
   });
-
   return await res.json();
 };
 
+export const createBuilding = async (data, token) => {
+  const res = await fetch(`${BASE_URL}/buildings`, {
+    method: "POST",
+    headers: getHeaders(token),
+    body: JSON.stringify(data),
+  });
+  return await res.json();
+};
 
-export const generateApartments = async (id) => {
+export const generateApartments = async (id, token) => {
   const res = await fetch(`${BASE_URL}/buildings/${id}/generate-apartments`, {
     method: "POST",
+    headers: getHeaders(token),
   });
-
   return await res.json();
 };
 
-
-export const checkBuildingCode = async (code, excludeId = null) => {
-  const params = new URLSearchParams();
-  if (excludeId) params.append("excludeId", excludeId);
-
-  const res = await fetch(
-    `${BASE_URL}/buildings/check-code/${code}?${params}`
-  );
-
-  return await res.json();
-};
-
-
-export const checkBuildingName = async (name, excludeId = null) => {
-  const params = new URLSearchParams();
-  if (excludeId) params.append("excludeId", excludeId);
-
-  const res = await fetch(
-    `${BASE_URL}/buildings/check-name/${name}?${params}`
-  );
-
+// Các hàm khác (nếu cần bảo mật thì thêm token tương tự)
+export const fetchBuildingById = async (id, token) => {
+  const res = await fetch(`${BASE_URL}/buildings/${id}`, {
+    headers: getHeaders(token),
+  });
   return await res.json();
 };

@@ -1,12 +1,14 @@
 const BASE_URL = "http://localhost:8080/building-management/api";
 
+const getHeaders = (token) => ({
+  "Content-Type": "application/json",
+  "Authorization": `Bearer ${token}`,
+});
 
 export const signIn = async (email, password) => {
   const res = await fetch(`${BASE_URL}/auth/signin`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers: getHeaders(token),
     body: JSON.stringify({
       email,
       password,
@@ -19,9 +21,7 @@ export const signIn = async (email, password) => {
 export const signUp = async (data) => {
   const res = await fetch(`${BASE_URL}/auth/signup`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers: getHeaders(token),
     body: JSON.stringify(data),
   });
 
@@ -29,9 +29,21 @@ export const signUp = async (data) => {
 };
 
 
-export const logout = async () => {
+
+
+export const getMyProfile = async (token) => {
+  const res = await fetch(`${BASE_URL}/users/me`, {
+    method: "GET",
+    headers: getHeaders(token),
+  });
+
+  return await res.json();
+};
+
+export const logout = async (token) => {
   const res = await fetch(`${BASE_URL}/auth/logout`, {
     method: "POST",
+    headers: getHeaders(token),
   });
 
   return await res.json();
