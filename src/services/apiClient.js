@@ -1,4 +1,4 @@
-const BASE_URL = "http://localhost:8080/building-management/api/v1";
+const BASE_URL = "http://localhost:8080/building-management/api";
 
 const handleResponse = async (response) => {
   if (!response.ok) {

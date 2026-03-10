@@ -10,22 +10,24 @@ import {
   MapPin,
   Clock,
   Loader2,
-  LayoutGrid
+  LayoutGrid,
+  Building2
 } from 'lucide-react';
 import { createMaintenanceRequest } from '../services/maintenanceRequestService';
+import { getApartmentsByResidentEmail } from '../services/apartmentApi';
+import { getBuildingByResidentEmail } from '../services/buildingApi';
+import { useAuth } from '../context/AuthContext';
 import AlertModal from '../components/common/AlertModal';
+import { useEffect, useRef } from 'react';
 
 export default function CreateMaintenanceRequest() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
-  const MOCK_BUILDINGS = [
-    { id: '1ba6cfce-0331-4179-883a-4da233de796e', name: 'Tòa nhà Tower A' } // ID tương đối hoặc lấy từ state/Context thực tế
-  ];
-
-  const MOCK_APARTMENTS = [
-    { id: 'd2e2b95c-5353-485a-8b80-ecf7ce2e8e3d', name: 'A-0101', buildingId: '1ba6cfce-0331-4179-883a-4da233de796e' },
-    { id: 'e2a8657f-fc8c-48be-a6b1-0960fafe052b', name: 'A-0103', buildingId: '1ba6cfce-0331-4179-883a-4da233de796e' }
-  ];
+  const [fetchingData, setFetchingData] = useState(true);
+  const [apartments, setApartments] = useState([]);
+  const [residentBuilding, setResidentBuilding] = useState(null);
+  const hasFetched = useRef(false);
 
   const [formData, setFormData] = useState({
     title: '',
@@ -35,9 +37,65 @@ export default function CreateMaintenanceRequest() {
     priority: 'NORMAL',
     preferredTime: '',
     isBillable: false,
-    apartmentId: '', // TODO: Get from context
-    buildingId: '1ba6cfce-0331-4179-883a-4da233de796e',   // TODO: Get from context
+    apartmentId: '',
+    buildingId: '',
   });
+
+  useEffect(() => {
+    const fetchResidentData = async () => {
+      if (!user?.email || hasFetched.current) return;
+      hasFetched.current = true;
+
+      setFetchingData(true);
+      try {
+        let bId = null;
+        let bName = null;
+
+        // 1. Lấy thông tin tòa nhà (Bọc try-catch riêng để không block bước sau)
+        try {
+          const buildingRes = await getBuildingByResidentEmail(user.email);
+          console.log('[DEBUG] Building API response:', buildingRes);
+          const bInfo = buildingRes?.result ?? buildingRes?.data ?? null;
+          if (bInfo) {
+            bId = bInfo.id ?? bInfo.buildingId;
+            bName = bInfo.name ?? bInfo.buildingName;
+            setResidentBuilding({ id: bId, name: bName });
+            setFormData(prev => ({ ...prev, buildingId: bId }));
+          }
+        } catch (bErr) {
+          console.warn('[DEBUG] Building API error:', bErr?.response?.status, bErr?.message);
+        }
+
+        // 2. Lấy danh sách căn hộ
+        const apartmentResponse = await getApartmentsByResidentEmail(user.email);
+        console.log('[DEBUG] Apartment API response:', apartmentResponse);
+        const fetchedApartments = apartmentResponse?.result ?? apartmentResponse?.data ?? [];
+        setApartments(fetchedApartments);
+        console.log('[DEBUG] Apartments:', fetchedApartments);
+
+        if (fetchedApartments.length > 0) {
+          const firstApt = fetchedApartments[0];
+          if (!bId) bId = firstApt.buildingId;
+          if (!bName) bName = firstApt.buildingName;
+
+          setResidentBuilding({ id: bId, name: bName });
+          setFormData(prev => ({
+            ...prev,
+            buildingId: bId,
+            apartmentId: fetchedApartments.length === 1 ? fetchedApartments[0].id : prev.apartmentId
+          }));
+        } else {
+          console.warn('[DEBUG] No apartments for user:', user.email);
+        }
+      } catch (err) {
+        console.error("Critical error fetching resident data:", err);
+      } finally {
+        setFetchingData(false);
+      }
+    };
+
+    fetchResidentData();
+  }, [user?.email]);
 
   const [alertConfig, setAlertConfig] = useState({ isOpen: false, title: '', message: '', type: 'info' });
 
@@ -60,13 +118,6 @@ export default function CreateMaintenanceRequest() {
     try {
       setLoading(true);
 
-      // Tạm thời comment validate để test dễ dàng
-      // if (!formData.apartmentId || !formData.buildingId) {
-      //   showAlert('Lỗi dữ liệu', 'Vui lòng chọn hoặc có thông tin Căn hộ/Tòa nhà', 'warning');
-      //   setLoading(false);
-      //   return;
-      // }
-
       const payload = { ...formData };
       if (!payload.apartmentId) payload.apartmentId = null;
       if (!payload.buildingId) payload.buildingId = null;
@@ -74,7 +125,6 @@ export default function CreateMaintenanceRequest() {
 
       const response = await createMaintenanceRequest(payload);
       if (response.code === 200) {
-        // Có thể redirect hoặc thông báo tạo thành công trước khi redirect
         navigate(`/maintenance/${response.result.id}`);
       } else {
         showAlert('Tạo thất bại', response.message || 'Có lỗi xảy ra khi tạo yêu cầu', 'error');
@@ -203,37 +253,39 @@ export default function CreateMaintenanceRequest() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
-                  <MapPin size={16} className="text-gray-400" />
+                  <Building2 size={16} className="text-gray-400" />
                   Tòa nhà
                 </label>
-                <select
-                  name="buildingId"
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none cursor-pointer font-medium appearance-none"
-                  value={formData.buildingId}
-                  onChange={handleChange}
-                >
-                  {MOCK_BUILDINGS.map(b => (
-                    <option key={b.id} value={b.id}>{b.name}</option>
-                  ))}
-                </select>
+                <div className="w-full px-4 py-3 bg-gray-100 border border-gray-200 rounded-xl font-bold text-gray-700 flex items-center gap-2">
+                  {fetchingData ? (
+                    <span className="text-blue-500 animate-pulse text-sm">Đang tải thông tin...</span>
+                  ) : residentBuilding ? (
+                    residentBuilding.name
+                  ) : (
+                    <span className="text-red-500 text-sm">Chưa gán tòa nhà</span>
+                  )}
+                </div>
               </div>
 
               <div className="space-y-2">
                 <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
                   <LayoutGrid size={16} className="text-gray-400" />
-                  Căn hộ
+                  Căn hộ <span className="text-red-500">*</span>
                 </label>
                 <select
                   name="apartmentId"
+                  required
                   className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none cursor-pointer font-medium appearance-none"
                   value={formData.apartmentId}
                   onChange={handleChange}
+                  disabled={fetchingData || !residentBuilding}
                 >
                   <option value="">-- Chọn căn hộ --</option>
-                  {MOCK_APARTMENTS.filter(a => a.buildingId === formData.buildingId).map(a => (
-                    <option key={a.id} value={a.id}>{a.name}</option>
+                  {apartments.filter(a => String(a.buildingId) === String(residentBuilding?.id)).map(a => (
+                    <option key={a.id} value={a.id}>{a.code}</option>
                   ))}
                 </select>
+                {!residentBuilding && !fetchingData && <p className="text-xs text-red-500 mt-1">Không tìm thấy tòa nhà của bạn</p>}
               </div>
             </div>
 
@@ -305,7 +357,7 @@ export default function CreateMaintenanceRequest() {
 
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || fetchingData}
                 className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-8 py-3 rounded-xl font-bold transition-all shadow-lg shadow-blue-200 active:scale-95"
               >
                 {loading ? (
