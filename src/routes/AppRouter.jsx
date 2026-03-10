@@ -39,7 +39,7 @@ const AppRouter = () => {
       ],
     },
     {
-      path: "/manager",
+      path: "/",
       element: (
         <ProtectedRoute>
           <ManagerLayout />
