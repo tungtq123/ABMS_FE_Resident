@@ -1,4 +1,7 @@
-const BASE_URL = "http://localhost:8080/building-management/api";
+import apiClient from "./apiClient";
+
+// apiClient dùng native fetch, trả về trực tiếp JSON body (không phải axios response.data)
+
 
 const getHeaders = (token) => ({
   "Content-Type": "application/json",
@@ -48,4 +51,3 @@ export const fetchBuildingById = async (id, token) => {
     headers: getHeaders(token),
   });
   return await res.json();
-};
