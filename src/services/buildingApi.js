@@ -1,9 +1,19 @@
 import apiClient from "./apiClient";
 
-// apiClient dùng native fetch, trả về trực tiếp JSON body (không phải axios response.data)
 
-export const fetchBuildings = async (page = 0, size = 10, search = "") => {
-  return await apiClient.get("/buildings", { page, size, search });
+export const fetchBuildings = async (
+  page = 0,
+  size = 10,
+  search = "",
+  apartmentsGenerated = ""
+) => {
+  const params = { page, size };
+  if (search) params.search = search;
+  if (apartmentsGenerated !== "") {
+    params.apartmentsGenerated = apartmentsGenerated;
+  }
+
+  return await apiClient.get("/buildings", params);
 };
 
 export const deleteBuilding = async (id) => {
