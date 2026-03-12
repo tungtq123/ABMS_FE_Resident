@@ -51,3 +51,4 @@ export const fetchBuildingById = async (id, token) => {
     headers: getHeaders(token),
   });
   return await res.json();
+}
