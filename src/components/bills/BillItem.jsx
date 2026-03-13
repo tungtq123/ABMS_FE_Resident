@@ -1,7 +1,7 @@
 import React from 'react';
 import { FileText, ChevronRight } from 'lucide-react';
 
-export default function BillItem({ bill }) {
+export default function BillItem({ bill, onClick }) {
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('vi-VN', { 
       style: 'decimal',
@@ -15,7 +15,9 @@ export default function BillItem({ bill }) {
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-md hover:shadow-lg transition-all border border-gray-100 overflow-hidden group cursor-pointer">
+    <div 
+      onClick={onClick}
+      className="bg-white rounded-xl shadow-md hover:shadow-lg transition-all border border-gray-100 overflow-hidden group cursor-pointer">
       <div className="p-6">
         <div className="flex items-center gap-6">
           {/* Icon */}

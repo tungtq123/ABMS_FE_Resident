@@ -5,6 +5,7 @@ import { getBillsByUser } from '../services/billService';
 import BillStats from '../components/bills/BillStats';
 import BillFilter from '../components/bills/BillFilter';
 import BillItem from '../components/bills/BillItem';
+import BillDetailModal from '../components/bills/BillDetailModal';
 
 export default function BillList() {
   const { user } = useContext(AuthContext);
@@ -13,6 +14,8 @@ export default function BillList() {
   const [apartmentCode, setApartmentCode] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [loading, setLoading] = useState(true);
+  const [selectedBill, setSelectedBill] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
     if (user?.id) {
@@ -55,6 +58,11 @@ export default function BillList() {
 
   // Local filtering is now done directly from the backend response.
   const filteredBills = bills;
+
+  const handleBillClick = (bill) => {
+    setSelectedBill(bill);
+    setIsModalOpen(true);
+  };
 
   const stats = {
     total: bills.length,
@@ -102,7 +110,7 @@ export default function BillList() {
             {/* Bill List */}
             <div className="space-y-4">
               {filteredBills.map((bill) => (
-                <BillItem key={bill.id} bill={bill} />
+                <BillItem key={bill.id} bill={bill} onClick={() => handleBillClick(bill)} />
               ))}
             </div>
 
@@ -118,6 +126,13 @@ export default function BillList() {
           </>
         )}
       </div>
+
+      {/* Detail Modal */}
+      <BillDetailModal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+        bill={selectedBill} 
+      />
     </div>
   );
 }
