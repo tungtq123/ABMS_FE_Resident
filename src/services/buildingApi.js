@@ -1,92 +1,45 @@
-const BASE_URL = "http://localhost:8080/building-management/api";
+import apiClient from "./apiClient";
 
-export const fetchBuildings = async (page = 0, size = 10, search = "") => {
-  const params = new URLSearchParams({
-    page,
-    size,
-    ...(search && { search }),
-  });
 
-  const res = await fetch(`${BASE_URL}/buildings?${params}`);
-  return await res.json();
+export const fetchBuildings = async (
+  page = 0,
+  size = 10,
+  search = "",
+  apartmentsGenerated = ""
+) => {
+  const params = { page, size };
+  if (search) params.search = search;
+  if (apartmentsGenerated !== "") {
+    params.apartmentsGenerated = apartmentsGenerated;
+  }
+
+  return await apiClient.get("/buildings", params);
 };
-
-
-export const fetchAllBuildings = async () => {
-  const res = await fetch(`${BASE_URL}/buildings/all`);
-  return await res.json();
-};
-
-
-export const fetchBuildingById = async (id) => {
-  const res = await fetch(`${BASE_URL}/buildings/${id}`);
-  return await res.json();
-};
-
-
-export const createBuilding = async (data) => {
-  const res = await fetch(`${BASE_URL}/buildings`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(data),
-  });
-
-  return await res.json();
-};
-
-
-export const updateBuilding = async (id, data) => {
-  const res = await fetch(`${BASE_URL}/buildings/${id}`, {
-    method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(data),
-  });
-
-  return await res.json();
-};
-
 
 export const deleteBuilding = async (id) => {
-  const res = await fetch(`${BASE_URL}/buildings/${id}`, {
-    method: "DELETE",
-  });
-
-  return await res.json();
+  return await apiClient.delete(`/buildings/${id}`);
 };
-
 
 export const generateApartments = async (id) => {
-  const res = await fetch(`${BASE_URL}/buildings/${id}/generate-apartments`, {
-    method: "POST",
-  });
-
-  return await res.json();
+  return await apiClient.post(`/buildings/${id}/generate-apartments`);
 };
 
-
-export const checkBuildingCode = async (code, excludeId = null) => {
-  const params = new URLSearchParams();
-  if (excludeId) params.append("excludeId", excludeId);
-
-  const res = await fetch(
-    `${BASE_URL}/buildings/check-code/${code}?${params}`
-  );
-
-  return await res.json();
+export const getBuildingByResidentEmail = async (email) => {
+  return await apiClient.get(`/buildings/resident/${email}`);
 };
 
+export const fetchAllBuildings = async () => {
+  return await apiClient.get("/buildings/all");
+};
 
-export const checkBuildingName = async (name, excludeId = null) => {
-  const params = new URLSearchParams();
-  if (excludeId) params.append("excludeId", excludeId);
+export const createBuilding = async (data) => {
+  return await apiClient.post("/buildings", data);
+};
 
-  const res = await fetch(
-    `${BASE_URL}/buildings/check-name/${name}?${params}`
-  );
+export const getBuildingById = async (id) => {
+  return await apiClient.get(`/buildings/${id}`);
+};
 
-  return await res.json();
+export const updateBuilding = async (id, data) => {
+  return await apiClient.put(`/buildings/${id}`, data);
 };
