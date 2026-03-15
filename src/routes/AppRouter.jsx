@@ -1,5 +1,6 @@
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import MakePayment from "../pages/MakePayment";
+import BillDetail from "../pages/BillDetail";
 import BillList from "../pages/BillList";
 import Dashboard from "../pages/Dashboard";
 import MaintenanceList from "../pages/MaintenanceList";
@@ -31,6 +32,7 @@ const AppRouter = () => {
       children: [
         { path: "dashboard", element: <Dashboard /> },
         { path: "payment/:billId", element: <MakePayment /> },
+        { path: "bills/:billId", element: <BillDetail /> },
         { path: "payment/bill-list", element: <BillList /> },
         { path: "maintenance", element: <MaintenanceList /> },
         { path: "maintenance/create", element: <CreateMaintenanceRequest /> },

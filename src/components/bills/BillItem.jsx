@@ -1,5 +1,6 @@
 import React from "react";
 import { FileText, ChevronRight } from "lucide-react";
+import { useNavigate } from "react-router";
 
 export default function BillItem({ bill }) {
   const formatCurrency = (amount) => {
@@ -15,6 +16,8 @@ export default function BillItem({ bill }) {
     if (!dateString) return "";
     return new Date(dateString).toLocaleDateString("vi-VN");
   };
+
+  const navigate = useNavigate();
 
   return (
     <div className="bg-white rounded-xl shadow-md hover:shadow-lg transition-all border border-gray-100 overflow-hidden group cursor-pointer">
@@ -74,12 +77,23 @@ export default function BillItem({ bill }) {
                   {formatCurrency(bill.totalAmount)}
                 </p>
               </div>
-              <button onClick={() => {
-                navigate(`payment/${id}}`)
-              }} className="px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors flex items-center gap-2 group-hover:scale-105 transition-transform">
-                {bill.status !== "PAID" ? "Thanh toán ngay" : "Xem chi tiết"}
-                <ChevronRight className="w-5 h-5" />
-              </button>
+              {bill.status !== "PAID" ? (
+                <button
+                  onClick={() => navigate(`/payment/${bill.id}`)}
+                  className="px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-all flex items-center gap-2 group-hover:scale-105"
+                >
+                  Thanh toán ngay
+                  <ChevronRight className="w-5 h-5" />
+                </button>
+              ) : (
+                <button
+                  onClick={() => navigate(`/bills/${bill.id}`)}
+                  className="px-6 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-all flex items-center gap-2 group-hover:scale-105"
+                >
+                  Xem chi tiết giao dịch
+                  <ChevronRight className="w-5 h-5" />
+                </button>
+              )}
             </div>
           </div>
         </div>

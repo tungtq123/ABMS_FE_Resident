@@ -30,11 +30,7 @@ export default function BuildingList() {
     setLoading(true);
     try {
       // FIX 2: Truyền token vào tham số thứ 5
-<<<<<<< HEAD
-      const data = await fetchBuildings(currentPage, pageSize, activeSearch, statusFilter, token);
-=======
       const data = await fetchBuildings(currentPage, pageSize, activeSearch, statusFilter);
->>>>>>> 62e7c15cdb6c15a5df357868d75df548dc239204
       if (data.code === 200 && data.result) {
         setBuildings(data.result.content || []); 
         setTotalPages(data.result.totalPages || 0);
@@ -44,11 +40,7 @@ export default function BuildingList() {
     } finally { 
       setLoading(false); 
     }
-<<<<<<< HEAD
-  }, [currentPage, pageSize, activeSearch, statusFilter, token]);
-=======
   }, [currentPage, pageSize, activeSearch, statusFilter]);
->>>>>>> 62e7c15cdb6c15a5df357868d75df548dc239204
 
   useEffect(() => { 
     loadBuildings(); 

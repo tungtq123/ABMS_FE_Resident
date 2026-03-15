@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { useParams, useNavigate } from "react-router-dom";
-import { fetchBillDetail, createPayment } from "../services/paymentService";
+import { createPayment } from "../services/paymentService";
 import BillInfoCard from "../components/payment/BillInfoCard";
 import AmountCard from "../components/payment/AmountCard";
 import ChargeDetailCard from "../components/payment/ChargeDetailCard";
@@ -12,6 +12,7 @@ import InfoNotice from "../components/payment/InfoNotice";
 import PaymentActions from "../components/payment/PaymentActions";
 import ReferenceUploadCard from "../components/payment/ReferenceUploadCard";
 import ReferenceCard from "../components/payment/ReferenceCard";
+import { getBillDetails } from "../services/billService";
 
 export default function MakePayment() {
   const { billId } = useParams();
@@ -21,18 +22,18 @@ export default function MakePayment() {
   const [payment, setPayment] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [previewUrl, setPreviewUrl] = useState(null);
-  const [referenceNumber, setReferenceNumber] = useState("");
+  // const [selectedFile, setSelectedFile] = useState(null);
+  // const [previewUrl, setPreviewUrl] = useState(null);
+  // const [referenceNumber, setReferenceNumber] = useState("");
   const [note, setNote] = useState("");
 
   useEffect(() => {
     const init = async () => {
       try {
-        const billData = await fetchBillDetail(billId);
+        const billData = await getBillDetails(billId);
         const paymentData = await createPayment(billId);
         setBill(billData.result);
-        setPayment(paymentData);
+        setPayment(paymentData.result);
       } catch (err) {
         console.error(err);
       } finally {
@@ -42,23 +43,23 @@ export default function MakePayment() {
     init();
   }, [billId]);
 
-  const handleFileSelect = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setSelectedFile(file);
-      setPreviewUrl(URL.createObjectURL(file));
-    }
-  };
+  // const handleFileSelect = (e) => {
+  //   const file = e.target.files[0];
+  //   if (file) {
+  //     setSelectedFile(file);
+  //     setPreviewUrl(URL.createObjectURL(file));
+  //   }
+  // };
 
-  const handleRemoveFile = () => {
-    setSelectedFile(null);
-    setPreviewUrl(null);
-  };
+  // const handleRemoveFile = () => {
+  //   setSelectedFile(null);
+  //   setPreviewUrl(null);
+  // };
 
-  const handleConfirm = () => {
-    // TODO: submit payment logic
-    console.log({ referenceNumber, note, selectedFile });
-  };
+  // const handleConfirm = () => {
+  //   // TODO: submit payment logic
+  //   console.log({ referenceNumber, note, selectedFile });
+  // };
 
   const handleCancel = () => {
     navigate(-1);
@@ -104,7 +105,7 @@ export default function MakePayment() {
         <div className="space-y-6">
           <BillInfoCard bill={bill} />
           <AmountCard totalAmount={bill?.totalAmount} />
-          <ChargeDetailCard items={bill?.items} />
+          <ChargeDetailCard items={bill?.details} />
         </div>
 
         {/* Right Column */}
@@ -118,7 +119,7 @@ export default function MakePayment() {
           <BankInfoCard bill={bill} />
 
           {/* Reference + Upload side by side */}
-          <div className="grid grid-cols-2 gap-4">
+          {/* <div className="grid grid-cols-2 gap-4">
             <ReferenceCard
               referenceNumber={referenceNumber}
               setReferenceNumber={setReferenceNumber}
@@ -129,11 +130,20 @@ export default function MakePayment() {
               onFileSelect={handleFileSelect}
               onRemoveFile={handleRemoveFile}
             />
-          </div>
+          </div> */}
 
           <NoteCard note={note} setNote={setNote} />
           <InfoNotice />
-          <PaymentActions onConfirm={handleConfirm} onCancel={handleCancel} />
+          {/* <PaymentActions onConfirm={handleConfirm} onCancel={handleCancel} /> */}
+
+          {bill?.status !== "PAID" && (
+            <ReferenceUploadCard
+              bill={bill}
+              payment={payment}
+              rejectedReason={payment?.rejectedReason}
+              onProofUploaded={() => {}}
+            />
+          )}
         </div>
       </div>
     </div>

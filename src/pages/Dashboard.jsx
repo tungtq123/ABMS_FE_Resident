@@ -334,7 +334,7 @@ export default function Dashboard() {
                 return (
                   <div
                     key={bill.id}
-                    onClick={() => navigate(`/bills/${bill.id}/payment`)}
+                    onClick={() => navigate(`/bill/${bill.id}/payment`)}
                     className="flex items-center gap-4 px-6 py-4 hover:bg-gray-50 cursor-pointer transition-all group"
                   >
                     <div

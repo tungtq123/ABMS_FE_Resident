@@ -20,13 +20,17 @@ export const deleteBuilding = async (id) => {
   return await apiClient.delete(`/buildings/${id}`);
 };
 
-export const deleteBuilding = async (id, token) => {
-  const res = await fetch(`${BASE_URL}/buildings/${id}`, {
-    method: "DELETE",
-    headers: getHeaders(token),
-  });
-  return await res.json();
-};
+export const getBuildingByResidentEmail = async (email) => {
+  return await apiClient.get(`/buildings/${email}`);
+}
+
+// export const deleteBuilding = async (id, token) => {
+//   const res = await fetch(`${BASE_URL}/buildings/${id}`, {
+//     method: "DELETE",
+//     headers: getHeaders(token),
+//   });
+//   return await res.json();
+// };
 
 export const createBuilding = async (data, token) => {
   const res = await fetch(`${BASE_URL}/buildings`, {
