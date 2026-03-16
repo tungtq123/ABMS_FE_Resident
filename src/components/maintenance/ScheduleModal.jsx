@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Calendar, Clock, Send, Loader2, MessageSquare } from 'lucide-react';
 import { proposeSchedule } from '../../services/maintenanceWorkflowService';
+import toast from 'react-hot-toast';
 
 export default function ScheduleModal({ requestId, onSuccess, onClose }) {
   const [proposedTime, setProposedTime] = useState('');
@@ -9,7 +10,10 @@ export default function ScheduleModal({ requestId, onSuccess, onClose }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!proposedTime) return alert('Vui lòng chọn thời gian');
+    if (!proposedTime) {
+      toast.error('Vui lòng chọn thời gian');
+      return;
+    }
 
     try {
       setLoading(true);
@@ -23,7 +27,7 @@ export default function ScheduleModal({ requestId, onSuccess, onClose }) {
       }
     } catch (err) {
       console.error(err);
-      alert('Có lỗi xảy ra khi đề xuất lịch');
+      toast.error('Có lỗi xảy ra khi đề xuất lịch');
     } finally {
       setLoading(false);
     }

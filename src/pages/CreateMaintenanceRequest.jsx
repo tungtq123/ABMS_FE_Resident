@@ -4,18 +4,20 @@ import {
   Wrench,
   ArrowLeft,
   Send,
-  Calendar,
   AlertTriangle,
   FileText,
   MapPin,
-  Clock,
   Loader2,
   LayoutGrid,
-  Building2
+  Building2,
+  ImagePlus,
+  X
 } from 'lucide-react';
 import { createMaintenanceRequest } from '../services/maintenanceRequestService';
 import { getApartmentsByResidentEmail } from '../services/apartmentApi';
 import { getBuildingByResidentEmail } from '../services/buildingApi';
+import { uploadFile } from '../services/fileService';
+import { addMaintenanceResource } from '../services/maintenanceWorkflowService';
 import { useAuth } from '../context/AuthContext';
 import AlertModal from '../components/common/AlertModal';
 import { useEffect, useRef } from 'react';
@@ -27,6 +29,7 @@ export default function CreateMaintenanceRequest() {
   const [fetchingData, setFetchingData] = useState(true);
   const [apartments, setApartments] = useState([]);
   const [residentBuilding, setResidentBuilding] = useState(null);
+  const [attachments, setAttachments] = useState([]);
   const hasFetched = useRef(false);
 
   const [formData, setFormData] = useState({
@@ -35,7 +38,6 @@ export default function CreateMaintenanceRequest() {
     scope: 'PRIVATE',
     category: 'REPAIR',
     priority: 'NORMAL',
-    preferredTime: '',
     isBillable: false,
     apartmentId: '',
     buildingId: '',
@@ -113,6 +115,16 @@ export default function CreateMaintenanceRequest() {
     }));
   };
 
+  const handleAttachmentChange = (e) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    setAttachments((prev) => [...prev, ...files].slice(0, 5));
+  };
+
+  const removeAttachment = (index) => {
+    setAttachments((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
@@ -121,10 +133,26 @@ export default function CreateMaintenanceRequest() {
       const payload = { ...formData };
       if (!payload.apartmentId) payload.apartmentId = null;
       if (!payload.buildingId) payload.buildingId = null;
-      if (!payload.preferredTime) payload.preferredTime = null;
 
       const response = await createMaintenanceRequest(payload);
       if (response.code === 200) {
+        const requestId = response?.result?.id;
+
+        if (requestId && attachments.length > 0) {
+          for (const file of attachments) {
+            const uploadRes = await uploadFile(file, 'maintenance');
+            const uploadedFile = uploadRes?.result;
+
+            if (uploadedFile?.url) {
+              await addMaintenanceResource(requestId, {
+                name: file.name,
+                url: uploadedFile.url,
+                resourceType: file.type.startsWith('image/') ? 'IMAGE' : 'DOCUMENT'
+              });
+            }
+          }
+        }
+
         navigate(`/maintenance/${response.result.id}`);
       } else {
         showAlert('Tạo thất bại', response.message || 'Có lỗi xảy ra khi tạo yêu cầu', 'error');
@@ -289,8 +317,8 @@ export default function CreateMaintenanceRequest() {
               </div>
             </div>
 
-            {/* Scope & Time */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Scope */}
+            <div>
               <div className="space-y-2">
                 <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
                   <MapPin size={16} className="text-gray-400" />
@@ -322,22 +350,37 @@ export default function CreateMaintenanceRequest() {
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
-                  <Calendar size={16} className="text-gray-400" />
-                  Thời gian mong muốn
-                </label>
-                <div className="relative">
-                  <Clock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-                  <input
-                    type="datetime-local"
-                    name="preferredTime"
-                    className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none font-medium"
-                    value={formData.preferredTime}
-                    onChange={handleChange}
-                  />
+
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
+                <ImagePlus size={16} className="text-gray-400" />
+                Ảnh/Tài liệu đính kèm (tối đa 5 file)
+              </label>
+              <input
+                type="file"
+                multiple
+                accept="image/*,.pdf,.doc,.docx"
+                onChange={handleAttachmentChange}
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm"
+              />
+              {attachments.length > 0 && (
+                <div className="space-y-2 mt-2">
+                  {attachments.map((file, idx) => (
+                    <div key={`${file.name}-${idx}`} className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                      <span className="text-sm text-gray-700 truncate pr-3">{file.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => removeAttachment(idx)}
+                        className="text-gray-400 hover:text-red-500"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  ))}
                 </div>
-              </div>
+              )}
             </div>
 
             <div className="pt-6 border-t border-gray-100 flex items-center justify-between gap-4">
