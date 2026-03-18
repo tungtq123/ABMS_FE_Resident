@@ -27,6 +27,12 @@ const STATUS_OPTIONS = [
   { value: 'REJECTED', label: 'Từ chối', tone: 'text-red-600' },
 ];
 
+const SCOPE_OPTIONS = [
+  { value: 'all', label: 'Tất cả phạm vi' },
+  { value: 'PRIVATE', label: 'Riêng tư' },
+  { value: 'PUBLIC', label: 'Công cộng' },
+];
+
 export default function MaintenanceList() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -35,6 +41,7 @@ export default function MaintenanceList() {
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [filterScope, setFilterScope] = useState('all');
 
   useEffect(() => {
     loadRequests();
@@ -63,10 +70,11 @@ export default function MaintenanceList() {
 
   const filteredRequests = requests.filter(req => {
     const matchesStatus = filterStatus === 'all' || req.requestStatus === filterStatus;
+    const matchesScope = filterScope === 'all' || req.scope === filterScope;
     const matchesSearch =
       req.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       req.code?.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesStatus && matchesSearch;
+    return matchesStatus && matchesScope && matchesSearch;
   });
 
   const statusCounts = requests.reduce((accumulator, request) => {
@@ -153,6 +161,18 @@ export default function MaintenanceList() {
               <option value="all">Tất cả trạng thái</option>
               {STATUS_OPTIONS.map((status) => (
                 <option key={status.value} value={status.value}>{status.label}</option>
+              ))}
+            </select>
+          </div>
+          <div className="relative md:w-56">
+            <Filter className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+            <select
+              className="w-full pl-11 pr-4 py-3 bg-gray-50 border-none rounded-xl focus:ring-2 focus:ring-blue-500/20 transition-all outline-none text-sm font-medium appearance-none cursor-pointer"
+              value={filterScope}
+              onChange={(e) => setFilterScope(e.target.value)}
+            >
+              {SCOPE_OPTIONS.map((scope) => (
+                <option key={scope.value} value={scope.value}>{scope.label}</option>
               ))}
             </select>
           </div>

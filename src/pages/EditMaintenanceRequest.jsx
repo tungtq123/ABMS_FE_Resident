@@ -27,7 +27,6 @@ export default function EditMaintenanceRequest() {
     category: 'REPAIR',
     priority: 'NORMAL',
     preferredTime: '',
-    isBillable: false,
   });
 
   const [alertConfig, setAlertConfig] = useState({ isOpen: false, title: '', message: '', type: 'info' });
@@ -54,7 +53,6 @@ export default function EditMaintenanceRequest() {
           category: data.category || 'REPAIR',
           priority: data.priority || 'NORMAL',
           preferredTime: data.preferredTime ? data.preferredTime.substring(0, 16) : '',
-          isBillable: data.isBillable || false,
         });
       }
     } catch (err) {
@@ -251,21 +249,7 @@ export default function EditMaintenanceRequest() {
               </div>
             </div>
 
-            <div className="pt-6 border-t border-gray-100 flex items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <input
-                  type="checkbox"
-                  id="isBillable"
-                  name="isBillable"
-                  className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 transition-all"
-                  checked={formData.isBillable}
-                  onChange={handleChange}
-                />
-                <label htmlFor="isBillable" className="text-sm font-medium text-gray-600 cursor-pointer">
-                  Đây là dịch vụ có tính phí
-                </label>
-              </div>
-
+            <div className="pt-6 border-t border-gray-100 flex items-center justify-end gap-4">
               <button
                 type="submit"
                 disabled={submitting}

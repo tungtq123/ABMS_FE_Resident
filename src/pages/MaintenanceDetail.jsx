@@ -6,6 +6,7 @@ import {
   Clock,
   User,
   Building,
+  MapPin,
   AlertCircle,
   CheckCircle2,
   MessageSquare,
@@ -31,6 +32,8 @@ import {
   fetchMaintenanceLogs,
   fetchMaintenanceResources
 } from '../services/maintenanceWorkflowService';
+import { fetchMaintenancePayableBill } from '../services/billService';
+import { mapResourcePreview } from '../utils/resourcePreview';
 import StatusBadge from '../components/maintenance/StatusBadge';
 import ReviewModal from "../components/maintenance/ReviewModal";
 import ScheduleModal from "../components/maintenance/ScheduleModal";
@@ -44,6 +47,19 @@ const QUOTATION_STATUS_MAP = {
   REJECTED: 'Bị từ chối',
   CANCELLED: 'Đã hủy',
   EXPIRED: 'Hết hạn'
+};
+
+const PRIORITY_LABEL_MAP = {
+  LOW: 'Thấp',
+  NORMAL: 'Bình thường',
+  MEDIUM: 'Trung bình',
+  HIGH: 'Cao',
+  CRITICAL: 'Khẩn cấp',
+};
+
+const SCOPE_LABEL_MAP = {
+  PUBLIC: 'Công cộng',
+  PRIVATE: 'Riêng tư',
 };
 
 export default function MaintenanceDetail() {
@@ -66,6 +82,8 @@ export default function MaintenanceDetail() {
   const [counterNote, setCounterNote] = useState('');
   const [quotationActionLoading, setQuotationActionLoading] = useState(false);
   const [actingQuotationId, setActingQuotationId] = useState(null);
+  const [payableBill, setPayableBill] = useState(null);
+  const [payableBillLoading, setPayableBillLoading] = useState(false);
   // Schedule action loading states
   const [scheduleActionLoading, setScheduleActionLoading] = useState(false);
   const [actingScheduleId, setActingScheduleId] = useState(null);
@@ -77,8 +95,46 @@ export default function MaintenanceDetail() {
   const loadAllData = async () => {
     try {
       setLoading(true);
-      const [reqRes, quoRes, schRes, proRes, resRes, logRes] = await Promise.all([
-        fetchMaintenanceRequestDetail(id),
+      const reqRes = await fetchMaintenanceRequestDetail(id);
+      if (reqRes.code !== 200) {
+        throw new Error('Cannot load maintenance request detail');
+      }
+
+      const requestData = reqRes.result;
+      setRequest(requestData);
+
+      if (requestData?.scope === 'PRIVATE' && requestData?.requestStatus === 'RESIDENT_ACCEPTED') {
+        setPayableBillLoading(true);
+        try {
+          const billRes = await fetchMaintenancePayableBill(id);
+          if (billRes.code === 200) {
+            setPayableBill(billRes.result || null);
+          } else {
+            setPayableBill(null);
+          }
+        } catch (billErr) {
+          setPayableBill(null);
+          console.error('Cannot load payable bill for maintenance request', billErr);
+        } finally {
+          setPayableBillLoading(false);
+        }
+      } else {
+        setPayableBill(null);
+        setPayableBillLoading(false);
+      }
+
+      if (requestData?.scope === 'PUBLIC') {
+        // Public requests in resident view are status-only.
+        setQuotations([]);
+        setSchedules([]);
+        setProgress([]);
+        setResources([]);
+        setLogs([]);
+        setActiveTab('detail');
+        return;
+      }
+
+      const [quoRes, schRes, proRes, resRes, logRes] = await Promise.all([
         fetchMaintenanceQuotations(id, true),
         fetchSchedules(id),
         fetchMaintenanceProgress(id),
@@ -86,7 +142,6 @@ export default function MaintenanceDetail() {
         fetchMaintenanceLogs(id)
       ]);
 
-      if (reqRes.code === 200) setRequest(reqRes.result);
       if (quoRes.code === 200) setQuotations(quoRes.result);
       if (schRes.code === 200) setSchedules(schRes.result);
       if (proRes.code === 200) setProgress(proRes.result);
@@ -198,6 +253,10 @@ export default function MaintenanceDetail() {
   }
 
   const latestQuotation = quotations.find(q => q.status === 'SENT');
+  const isPublicViewOnly = request.scope === 'PUBLIC';
+  const resourcePreviews = resources
+    .map(mapResourcePreview)
+    .filter((item) => item.resolvedUrl && item.isImage);
   // Schedule logic: filter for staff-proposed schedules
   const latestScheduleFromStaff = schedules.find(s => s.status === 'PROPOSED' && s.proposedByRole === 'STAFF');
   // Resident can propose schedule in all statuses allowed by backend.
@@ -279,7 +338,7 @@ export default function MaintenanceDetail() {
           </div>
 
           <div className="flex gap-2">
-            {['PENDING', 'VERIFYING'].includes(request.requestStatus) && (
+            {!isPublicViewOnly && ['PENDING', 'VERIFYING'].includes(request.requestStatus) && (
               <>
                 <button
                   onClick={() => navigate(`/maintenance/edit/${id}`)}
@@ -307,7 +366,7 @@ export default function MaintenanceDetail() {
             { id: 'quotation', label: 'Báo giá', icon: DollarSign, count: quotations.length },
             { id: 'schedule', label: 'Lịch sửa', icon: Calendar, count: schedules.length },
             { id: 'progress', label: 'Tiến độ', icon: History, count: progress.length },
-          ].map((tab) => (
+          ].filter((tab) => !isPublicViewOnly || tab.id === 'detail').map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
@@ -337,7 +396,7 @@ export default function MaintenanceDetail() {
           {activeTab === 'detail' && (
             <>
               {/* Resident Action: Review (COMPLETED status) */}
-              {request.requestStatus === 'COMPLETED' && (
+              {!isPublicViewOnly && request.requestStatus === 'COMPLETED' && (
                 <div className="bg-green-50 border border-green-100 rounded-2xl p-6 shadow-sm mb-8 animate-pulse-slow">
                   <div className="flex items-center gap-3 mb-4">
                     <div className="w-10 h-10 bg-green-600 rounded-xl flex items-center justify-center text-white">
@@ -357,8 +416,43 @@ export default function MaintenanceDetail() {
                 </div>
               )}
 
+              {!isPublicViewOnly && request.requestStatus === 'RESIDENT_ACCEPTED' && (
+                <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-6 shadow-sm mb-8">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white">
+                      <DollarSign size={20} />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-indigo-900">Thanh toán trực tuyến</h3>
+                      <p className="text-xs text-indigo-600 font-medium">Yêu cầu đã nghiệm thu và đánh giá xong. Bạn có thể thanh toán online.</p>
+                    </div>
+                  </div>
+
+                  {payableBillLoading && (
+                    <p className="text-sm text-indigo-700 font-medium">Đang kiểm tra hóa đơn liên quan...</p>
+                  )}
+
+                  {!payableBillLoading && payableBill && payableBill.status !== 'PAID' && (
+                    <button
+                      onClick={() => navigate(`/payment/${payableBill.id}?maintenanceRequestId=${id}&maintenanceRequestCode=${encodeURIComponent(request.code || '')}`)}
+                      className="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold text-sm shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all active:scale-95"
+                    >
+                      Thanh toán online ngay
+                    </button>
+                  )}
+
+                  {!payableBillLoading && payableBill?.status === 'PAID' && (
+                    <p className="text-sm font-bold text-green-700">Yêu cầu này đã được thanh toán.</p>
+                  )}
+
+                  {!payableBillLoading && !payableBill && (
+                    <p className="text-sm text-amber-700 font-medium">Hóa đơn đang được đồng bộ, vui lòng thử lại sau ít phút.</p>
+                  )}
+                </div>
+              )}
+
               {/* Resident Action: Propose Schedule (for APPROVED requests without pending staff proposal) */}
-              {canResidentProposeSchedule && (
+              {!isPublicViewOnly && canResidentProposeSchedule && (
                 <div className="bg-blue-50 border border-blue-100 rounded-2xl p-6 shadow-sm mb-8">
                   <div className="flex items-center gap-3 mb-4">
                     <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white">
@@ -386,20 +480,39 @@ export default function MaintenanceDetail() {
                 </p>
               </div>
 
-              {resources.length > 0 && (
+              {!isPublicViewOnly && resourcePreviews.length > 0 && (
                 <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
                   <h3 className="text-sm font-black text-gray-400 uppercase tracking-widest mb-4">Tài nguyên đính kèm</h3>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                    {resources.map((resource) => (
+                    {resourcePreviews.map((resource) => (
                       <a
                         key={resource.id}
-                        href={resource.url}
+                        href={resource.resolvedUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className="block border border-gray-200 rounded-xl p-3 hover:bg-gray-50"
+                        className="relative block border border-gray-200 rounded-xl overflow-hidden hover:opacity-90 transition"
                       >
-                        <p className="text-sm font-bold text-gray-800 truncate">{resource.name}</p>
-                        <p className="text-xs text-gray-400 mt-1">{resource.resourceType || 'OTHER'}</p>
+                        <span
+                          className={`absolute top-2 left-2 z-10 px-2 py-0.5 rounded-full text-[10px] font-bold text-white ${
+                            resource.uploaderRole === "STAFF"
+                              ? "bg-sky-700/90"
+                              : resource.uploaderRole === "RESIDENT"
+                                ? "bg-emerald-700/90"
+                                : "bg-gray-700/85"
+                          }`}
+                        >
+                          {resource.uploaderRole === 'STAFF'
+                            ? 'Nhân viên'
+                            : resource.uploaderRole === 'RESIDENT'
+                              ? 'Cư dân'
+                              : 'Không rõ'}
+                        </span>
+                        <img
+                          src={resource.resolvedUrl}
+                          alt="maintenance"
+                          className="w-full h-36 object-cover"
+                          loading="lazy"
+                        />
                       </a>
                     ))}
                   </div>
@@ -407,7 +520,7 @@ export default function MaintenanceDetail() {
               )}
 
               {/* Resident Action: Quotation */}
-              {latestQuotation && (
+              {!isPublicViewOnly && latestQuotation && (
                 <div className="bg-purple-50 border border-purple-100 rounded-2xl p-6 shadow-sm">
                   <div className="flex items-center gap-3 mb-4">
                     <div className="w-10 h-10 bg-purple-600 rounded-xl flex items-center justify-center text-white">
@@ -437,7 +550,7 @@ export default function MaintenanceDetail() {
               )}
 
               {/* Resident Action: Approved Schedule (navigate to schedule tab) */}
-              {['APPROVED', 'IN_PROGRESS'].includes(request.requestStatus) && latestScheduleFromStaff && (
+              {!isPublicViewOnly && ['APPROVED', 'IN_PROGRESS'].includes(request.requestStatus) && latestScheduleFromStaff && (
                 <div className="bg-blue-50 border border-blue-100 rounded-2xl p-6 shadow-sm">
                   <div className="flex items-center gap-3 mb-4">
                     <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white">
@@ -705,8 +818,21 @@ export default function MaintenanceDetail() {
                   <Building size={16} />
                 </div>
                 <div>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Căn hộ</p>
-                  <p className="text-sm font-bold text-gray-900">{request.apartmentCode} - {request.buildingName}</p>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{isPublicViewOnly ? 'Tòa nhà' : 'Căn hộ'}</p>
+                  <p className="text-sm font-bold text-gray-900">
+                    {isPublicViewOnly
+                      ? `${request.buildingName || 'Không rõ'}`
+                      : `${request.apartmentCode} - ${request.buildingName}`}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-gray-50 rounded-lg flex items-center justify-center text-gray-400">
+                  <MapPin size={16} />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Phạm vi</p>
+                  <p className="text-sm font-bold text-gray-900">{SCOPE_LABEL_MAP[request.scope] || request.scope || 'Không rõ'}</p>
                 </div>
               </div>
               <div className="flex items-center gap-3">
@@ -737,7 +863,7 @@ export default function MaintenanceDetail() {
                     request.priority === 'CRITICAL' ? 'text-red-600' :
                     request.priority === 'HIGH' ? 'text-orange-600' :
                     'text-blue-600'
-                  }`}>{request.priority}</p>
+                  }`}>{PRIORITY_LABEL_MAP[request.priority] || request.priority}</p>
                 </div>
               </div>
             </div>
