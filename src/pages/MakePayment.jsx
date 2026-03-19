@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { ArrowLeft } from "lucide-react";
-import { useParams, useNavigate } from "react-router-dom";
-import { fetchBillDetail, createPayment } from "../services/paymentService";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
+import { createPayment } from "../services/paymentService";
+import { fetchMaintenanceQuotations } from "../services/maintenanceQuotationService";
 import BillInfoCard from "../components/payment/BillInfoCard";
 import AmountCard from "../components/payment/AmountCard";
 import ChargeDetailCard from "../components/payment/ChargeDetailCard";
@@ -12,27 +13,39 @@ import InfoNotice from "../components/payment/InfoNotice";
 import PaymentActions from "../components/payment/PaymentActions";
 import ReferenceUploadCard from "../components/payment/ReferenceUploadCard";
 import ReferenceCard from "../components/payment/ReferenceCard";
+import { getBillDetails } from "../services/billService";
 
 export default function MakePayment() {
   const { billId } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const maintenanceRequestId = searchParams.get("maintenanceRequestId");
+  const maintenanceRequestCode = searchParams.get("maintenanceRequestCode");
 
   const [bill, setBill] = useState(null);
   const [payment, setPayment] = useState(null);
+  const [quotationItems, setQuotationItems] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [previewUrl, setPreviewUrl] = useState(null);
-  const [referenceNumber, setReferenceNumber] = useState("");
+  // const [selectedFile, setSelectedFile] = useState(null);
+  // const [previewUrl, setPreviewUrl] = useState(null);
+  // const [referenceNumber, setReferenceNumber] = useState("");
   const [note, setNote] = useState("");
 
   useEffect(() => {
     const init = async () => {
       try {
-        const billData = await fetchBillDetail(billId);
-        const paymentData = await createPayment(billId);
-        setBill(billData);
-        setPayment(paymentData);
+        const billData = await getBillDetails(billId);
+        const paymentData = await createPayment(billId, maintenanceRequestId || undefined);
+        if (maintenanceRequestId) {
+          const quotationRes = await fetchMaintenanceQuotations(maintenanceRequestId, true);
+          const approvedQuotation = (quotationRes?.result || []).find((q) => q.status === "APPROVED");
+          setQuotationItems(approvedQuotation?.items || []);
+        } else {
+          setQuotationItems([]);
+        }
+        setBill(billData.result);
+        setPayment(paymentData.result);
       } catch (err) {
         console.error(err);
       } finally {
@@ -40,25 +53,50 @@ export default function MakePayment() {
       }
     };
     init();
-  }, [billId]);
+  }, [billId, maintenanceRequestId]);
 
-  const handleFileSelect = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setSelectedFile(file);
-      setPreviewUrl(URL.createObjectURL(file));
-    }
-  };
+  const maintenanceItems = (bill?.details || []).filter((item) => {
+    if (!maintenanceRequestId) return true;
+    if (!maintenanceRequestCode) return true;
+    const desc = (item?.description || "").toLowerCase();
+    return desc.includes(maintenanceRequestCode.toLowerCase());
+  });
 
-  const handleRemoveFile = () => {
-    setSelectedFile(null);
-    setPreviewUrl(null);
-  };
+  const quotationDetailItems = quotationItems.map((item) => {
+    const quantity = Number(item?.quantity || 0);
+    const unitPrice = Number(item?.unitPrice || 0);
+    return {
+      description: item?.description || item?.name || "Hạng mục bảo trì",
+      quantity,
+      unitPrice,
+      totalLine: quantity * unitPrice,
+    };
+  });
 
-  const handleConfirm = () => {
-    // TODO: submit payment logic
-    console.log({ referenceNumber, note, selectedFile });
-  };
+  const displayItems = maintenanceRequestId
+    ? (quotationDetailItems.length > 0 ? quotationDetailItems : maintenanceItems)
+    : (bill?.details || []);
+  const displayAmount = maintenanceRequestId
+    ? (payment?.amount || maintenanceItems.reduce((sum, item) => sum + Number(item?.totalLine || item?.unitPrice || 0), 0))
+    : bill?.totalAmount;
+
+  // const handleFileSelect = (e) => {
+  //   const file = e.target.files[0];
+  //   if (file) {
+  //     setSelectedFile(file);
+  //     setPreviewUrl(URL.createObjectURL(file));
+  //   }
+  // };
+
+  // const handleRemoveFile = () => {
+  //   setSelectedFile(null);
+  //   setPreviewUrl(null);
+  // };
+
+  // const handleConfirm = () => {
+  //   // TODO: submit payment logic
+  //   console.log({ referenceNumber, note, selectedFile });
+  // };
 
   const handleCancel = () => {
     navigate(-1);
@@ -83,8 +121,14 @@ export default function MakePayment() {
         <div className="flex items-center gap-3">
           <div className="w-1 h-10 bg-blue-600 rounded-full" />
           <div>
-            <h1 className="text-lg font-bold text-gray-900 leading-tight">Thanh toán hóa đơn</h1>
-            <p className="text-xs text-gray-400">Hoàn tất thanh toán hóa đơn của bạn</p>
+            <h1 className="text-lg font-bold text-gray-900 leading-tight">
+              {maintenanceRequestId ? "Thanh toán phiếu bảo trì" : "Thanh toán hóa đơn"}
+            </h1>
+            <p className="text-xs text-gray-400">
+              {maintenanceRequestId
+                ? "Chỉ thanh toán khoản phí bảo trì của yêu cầu này"
+                : "Hoàn tất thanh toán hóa đơn của bạn"}
+            </p>
           </div>
         </div>
 
@@ -103,8 +147,8 @@ export default function MakePayment() {
         {/* Left Column */}
         <div className="space-y-6">
           <BillInfoCard bill={bill} />
-          <AmountCard totalAmount={bill?.totalAmount} />
-          <ChargeDetailCard items={bill?.items} />
+          <AmountCard totalAmount={displayAmount} />
+          <ChargeDetailCard items={displayItems} />
         </div>
 
         {/* Right Column */}
@@ -118,7 +162,7 @@ export default function MakePayment() {
           <BankInfoCard bill={bill} />
 
           {/* Reference + Upload side by side */}
-          <div className="grid grid-cols-2 gap-4">
+          {/* <div className="grid grid-cols-2 gap-4">
             <ReferenceCard
               referenceNumber={referenceNumber}
               setReferenceNumber={setReferenceNumber}
@@ -129,11 +173,20 @@ export default function MakePayment() {
               onFileSelect={handleFileSelect}
               onRemoveFile={handleRemoveFile}
             />
-          </div>
+          </div> */}
 
           <NoteCard note={note} setNote={setNote} />
           <InfoNotice />
-          <PaymentActions onConfirm={handleConfirm} onCancel={handleCancel} />
+          {/* <PaymentActions onConfirm={handleConfirm} onCancel={handleCancel} /> */}
+
+          {bill?.status !== "PAID" && (
+            <ReferenceUploadCard
+              bill={bill}
+              payment={payment}
+              rejectedReason={payment?.rejectedReason}
+              onProofUploaded={() => {}}
+            />
+          )}
         </div>
       </div>
     </div>

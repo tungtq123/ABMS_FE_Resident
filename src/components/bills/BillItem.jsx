@@ -1,18 +1,23 @@
-import React from 'react';
-import { FileText, ChevronRight } from 'lucide-react';
+import React from "react";
+import { FileText, ChevronRight } from "lucide-react";
+import { useNavigate } from "react-router";
 
 export default function BillItem({ bill, onClick }) {
   const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('vi-VN', { 
-      style: 'decimal',
-      minimumFractionDigits: 0
-    }).format(amount || 0) + ' đ';
+    return (
+      new Intl.NumberFormat("vi-VN", {
+        style: "decimal",
+        minimumFractionDigits: 0,
+      }).format(amount || 0) + " đ"
+    );
   };
 
   const formatDate = (dateString) => {
-    if (!dateString) return '';
-    return new Date(dateString).toLocaleDateString('vi-VN');
+    if (!dateString) return "";
+    return new Date(dateString).toLocaleDateString("vi-VN");
   };
+
+  const navigate = useNavigate();
 
   return (
     <div 
@@ -32,13 +37,16 @@ export default function BillItem({ bill, onClick }) {
                 <h3 className="text-gray-900 font-bold text-lg mb-1">
                   Hóa đơn kỳ: {bill.periodCode}
                 </h3>
-                <p className="text-gray-600 text-sm">Căn hộ: <span className="font-medium">{bill.apartmentCode}</span></p>
+                <p className="text-gray-600 text-sm">
+                  Căn hộ:{" "}
+                  <span className="font-medium">{bill.apartmentCode}</span>
+                </p>
               </div>
-              {bill.status === 'PAID' ? (
+              {bill.status === "PAID" ? (
                 <span className="px-4 py-2 bg-green-100 text-green-700 text-sm font-semibold rounded-full whitespace-nowrap">
                   Đã thanh toán
                 </span>
-              ) : bill.status === 'PARTIAL' ? (
+              ) : bill.status === "PARTIAL" ? (
                 <span className="px-4 py-2 bg-yellow-100 text-yellow-700 text-sm font-semibold rounded-full whitespace-nowrap">
                   Thanh toán 1 phần
                 </span>
@@ -52,23 +60,42 @@ export default function BillItem({ bill, onClick }) {
             <div className="grid grid-cols-3 gap-4 mb-3">
               <div>
                 <p className="text-gray-500 text-xs mb-1">Ngày phát hành</p>
-                <p className="text-gray-900 font-medium text-sm">{formatDate(bill.issuedAt)}</p>
+                <p className="text-gray-900 font-medium text-sm">
+                  {formatDate(bill.issuedAt)}
+                </p>
               </div>
               <div>
                 <p className="text-gray-500 text-xs mb-1">Hạn thanh toán</p>
-                <p className="text-gray-900 font-medium text-sm">{formatDate(bill.dueDate)}</p>
+                <p className="text-gray-900 font-medium text-sm">
+                  {formatDate(bill.dueDate)}
+                </p>
               </div>
             </div>
 
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-600 text-sm mb-1">Tổng tiền</p>
-                <p className="text-2xl font-bold text-blue-700">{formatCurrency(bill.totalAmount)}</p>
+                <p className="text-2xl font-bold text-blue-700">
+                  {formatCurrency(bill.totalAmount)}
+                </p>
               </div>
-              <button className="px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors flex items-center gap-2 group-hover:scale-105 transition-transform">
-                {bill.status !== 'PAID' ? 'Thanh toán ngay' : 'Xem chi tiết'}
-                <ChevronRight className="w-5 h-5" />
-              </button>
+              {bill.status !== "PAID" ? (
+                <button
+                  onClick={() => navigate(`/payment/${bill.id}`)}
+                  className="px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-all flex items-center gap-2 group-hover:scale-105"
+                >
+                  Thanh toán ngay
+                  <ChevronRight className="w-5 h-5" />
+                </button>
+              ) : (
+                <button
+                  onClick={() => navigate(`/bills/${bill.id}`)}
+                  className="px-6 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-all flex items-center gap-2 group-hover:scale-105"
+                >
+                  Xem chi tiết giao dịch
+                  <ChevronRight className="w-5 h-5" />
+                </button>
+              )}
             </div>
           </div>
         </div>

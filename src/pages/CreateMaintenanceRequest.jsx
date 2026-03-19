@@ -1,24 +1,25 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Wrench,
   ArrowLeft,
   Send,
-  Calendar,
   AlertTriangle,
   FileText,
   MapPin,
-  Clock,
   Loader2,
   LayoutGrid,
-  Building2
+  Building2,
+  ImagePlus,
+  X
 } from 'lucide-react';
 import { createMaintenanceRequest } from '../services/maintenanceRequestService';
 import { getApartmentsByResidentEmail } from '../services/apartmentApi';
 import { getBuildingByResidentEmail } from '../services/buildingApi';
+import { uploadFile } from '../services/fileService';
+import { addMaintenanceResource } from '../services/maintenanceWorkflowService';
 import { useAuth } from '../context/AuthContext';
 import AlertModal from '../components/common/AlertModal';
-import { useEffect, useRef } from 'react';
 
 export default function CreateMaintenanceRequest() {
   const navigate = useNavigate();
@@ -27,7 +28,10 @@ export default function CreateMaintenanceRequest() {
   const [fetchingData, setFetchingData] = useState(true);
   const [apartments, setApartments] = useState([]);
   const [residentBuilding, setResidentBuilding] = useState(null);
+  const [attachments, setAttachments] = useState([]);
   const hasFetched = useRef(false);
+  const attachmentsRef = useRef([]);
+  const attachmentsInputRef = useRef(null);
 
   const [formData, setFormData] = useState({
     title: '',
@@ -35,8 +39,6 @@ export default function CreateMaintenanceRequest() {
     scope: 'PRIVATE',
     category: 'REPAIR',
     priority: 'NORMAL',
-    preferredTime: '',
-    isBillable: false,
     apartmentId: '',
     buildingId: '',
   });
@@ -97,6 +99,20 @@ export default function CreateMaintenanceRequest() {
     fetchResidentData();
   }, [user?.email]);
 
+  useEffect(() => {
+    attachmentsRef.current = attachments;
+  }, [attachments]);
+
+  useEffect(() => {
+    return () => {
+      attachmentsRef.current.forEach((item) => {
+        if (item.previewUrl) {
+          URL.revokeObjectURL(item.previewUrl);
+        }
+      });
+    };
+  }, []);
+
   const [alertConfig, setAlertConfig] = useState({ isOpen: false, title: '', message: '', type: 'info' });
 
   const showAlert = (title, message, type = 'info') => {
@@ -107,10 +123,60 @@ export default function CreateMaintenanceRequest() {
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
+    if (name === 'scope') {
+      setFormData(prev => ({
+        ...prev,
+        scope: value,
+        apartmentId: value === 'PUBLIC' ? '' : prev.apartmentId,
+      }));
+      return;
+    }
+
     setFormData(prev => ({
       ...prev,
       [name]: type === 'checkbox' ? checked : value
     }));
+  };
+
+  const handleAttachmentChange = (e) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    const mapped = files.map((file) => {
+      const isImage = file.type.startsWith('image/');
+      return {
+        id: `${file.name}-${file.size}-${file.lastModified}-${Math.random().toString(36).slice(2, 8)}`,
+        file,
+        isImage,
+        previewUrl: isImage ? URL.createObjectURL(file) : null,
+      };
+    });
+
+    setAttachments((prev) => {
+      const combined = [...prev, ...mapped].slice(0, 5);
+      const keepIds = new Set(combined.map((item) => item.id));
+      [...prev, ...mapped].forEach((item) => {
+        if (!keepIds.has(item.id) && item.previewUrl) {
+          URL.revokeObjectURL(item.previewUrl);
+        }
+      });
+      return combined;
+    });
+
+    e.target.value = '';
+  };
+
+  const removeAttachment = (id) => {
+    setAttachments((prev) => {
+      const target = prev.find((item) => item.id === id);
+      if (target?.previewUrl) {
+        URL.revokeObjectURL(target.previewUrl);
+      }
+      return prev.filter((item) => item.id !== id);
+    });
+  };
+
+  const openAttachmentPicker = () => {
+    attachmentsInputRef.current?.click();
   };
 
   const handleSubmit = async (e) => {
@@ -119,12 +185,32 @@ export default function CreateMaintenanceRequest() {
       setLoading(true);
 
       const payload = { ...formData };
+      if (payload.scope === 'PUBLIC') {
+        payload.apartmentId = null;
+      }
       if (!payload.apartmentId) payload.apartmentId = null;
       if (!payload.buildingId) payload.buildingId = null;
-      if (!payload.preferredTime) payload.preferredTime = null;
 
       const response = await createMaintenanceRequest(payload);
       if (response.code === 200) {
+        const requestId = response?.result?.id;
+
+        if (requestId && attachments.length > 0) {
+          for (const attachment of attachments) {
+            const file = attachment.file;
+            const uploadRes = await uploadFile(file, 'maintenance');
+            const uploadedFile = uploadRes?.result;
+
+            if (uploadedFile?.url) {
+              await addMaintenanceResource(requestId, {
+                name: file.name,
+                url: uploadedFile.url,
+                resourceType: file.type.startsWith('image/') ? 'IMAGE' : 'DOCUMENT'
+              });
+            }
+          }
+        }
+
         navigate(`/maintenance/${response.result.id}`);
       } else {
         showAlert('Tạo thất bại', response.message || 'Có lỗi xảy ra khi tạo yêu cầu', 'error');
@@ -270,27 +356,30 @@ export default function CreateMaintenanceRequest() {
               <div className="space-y-2">
                 <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
                   <LayoutGrid size={16} className="text-gray-400" />
-                  Căn hộ <span className="text-red-500">*</span>
+                  Căn hộ {formData.scope === 'PRIVATE' && <span className="text-red-500">*</span>}
                 </label>
                 <select
                   name="apartmentId"
-                  required
+                  required={formData.scope === 'PRIVATE'}
                   className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none cursor-pointer font-medium appearance-none"
                   value={formData.apartmentId}
                   onChange={handleChange}
-                  disabled={fetchingData || !residentBuilding}
+                  disabled={fetchingData || !residentBuilding || formData.scope === 'PUBLIC'}
                 >
                   <option value="">-- Chọn căn hộ --</option>
                   {apartments.filter(a => String(a.buildingId) === String(residentBuilding?.id)).map(a => (
                     <option key={a.id} value={a.id}>{a.code}</option>
                   ))}
                 </select>
+                {formData.scope === 'PUBLIC' && (
+                  <p className="text-xs text-blue-600 mt-1">Yêu cầu công cộng sẽ áp dụng cho toàn tòa nhà, không gắn căn hộ.</p>
+                )}
                 {!residentBuilding && !fetchingData && <p className="text-xs text-red-500 mt-1">Không tìm thấy tòa nhà của bạn</p>}
               </div>
             </div>
 
-            {/* Scope & Time */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Scope */}
+            <div>
               <div className="space-y-2">
                 <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
                   <MapPin size={16} className="text-gray-400" />
@@ -322,39 +411,78 @@ export default function CreateMaintenanceRequest() {
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
-                  <Calendar size={16} className="text-gray-400" />
-                  Thời gian mong muốn
-                </label>
-                <div className="relative">
-                  <Clock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-                  <input
-                    type="datetime-local"
-                    name="preferredTime"
-                    className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none font-medium"
-                    value={formData.preferredTime}
-                    onChange={handleChange}
-                  />
-                </div>
-              </div>
+
             </div>
 
-            <div className="pt-6 border-t border-gray-100 flex items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <input
-                  type="checkbox"
-                  id="isBillable"
-                  name="isBillable"
-                  className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 transition-all"
-                  checked={formData.isBillable}
-                  onChange={handleChange}
-                />
-                <label htmlFor="isBillable" className="text-sm font-medium text-gray-600 cursor-pointer">
-                  Đây là dịch vụ có tính phí
-                </label>
+            <div className="space-y-2">
+              <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
+                <ImagePlus size={16} className="text-gray-400" />
+                Ảnh/Tài liệu đính kèm (tối đa 5 file)
+              </label>
+              <input
+                ref={attachmentsInputRef}
+                type="file"
+                multiple
+                accept="image/*,.pdf,.doc,.docx"
+                onChange={handleAttachmentChange}
+                className="hidden"
+              />
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={openAttachmentPicker}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    openAttachmentPicker();
+                  }
+                }}
+                className="w-full px-4 py-4 bg-gray-50 border border-dashed border-gray-300 rounded-xl text-sm cursor-pointer hover:bg-blue-50 hover:border-blue-300 transition-all flex items-center justify-between gap-3"
+              >
+                <div className="flex items-center gap-3 text-gray-600 min-w-0">
+                  <ImagePlus size={18} className="text-blue-500" />
+                  <span className="font-medium truncate">
+                    {attachments.length > 0
+                      ? `Đã chọn ${attachments.length} file`
+                      : 'Bấm để chọn ảnh/tài liệu hoặc kéo thả vào đây'}
+                  </span>
+                </div>
+                <span className="inline-flex items-center px-3 py-1.5 rounded-lg bg-blue-600 text-white font-semibold text-xs whitespace-nowrap">
+                  Chọn file
+                </span>
               </div>
+              {attachments.length > 0 && (
+                <div className="space-y-2 mt-2">
+                  {attachments.map((item) => (
+                    <div key={item.id} className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        {item.isImage ? (
+                          <img
+                            src={item.previewUrl}
+                            alt={item.file.name}
+                            className="w-12 h-12 rounded-md object-cover border border-gray-200"
+                          />
+                        ) : (
+                          <div className="w-12 h-12 rounded-md border border-dashed border-gray-300 flex items-center justify-center text-gray-400">
+                            <FileText size={16} />
+                          </div>
+                        )}
+                        <span className="text-sm text-gray-700 truncate pr-3">{item.file.name}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeAttachment(item.id)}
+                        className="text-gray-400 hover:text-red-500"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
+            <div className="pt-6 border-t border-gray-100 flex items-center justify-end gap-4">
               <button
                 type="submit"
                 disabled={loading || fetchingData}

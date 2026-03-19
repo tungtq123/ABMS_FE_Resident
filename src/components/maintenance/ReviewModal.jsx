@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { Star, Send, Loader2, RotateCcw, CheckCircle2 } from 'lucide-react';
+import { Star, Send, Loader2, RotateCcw, CheckCircle2, ShieldCheck } from 'lucide-react';
 import { submitMaintenanceReview } from '../../services/maintenanceWorkflowService';
 import AlertModal from '../common/AlertModal';
 
-export default function ReviewModal({ requestId, on处Success, onClose }) {
+export default function ReviewModal({ requestId, onSuccess, onClose }) {
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState('');
   const [outcome, setOutcome] = useState('ACCEPTED');
@@ -25,7 +25,7 @@ export default function ReviewModal({ requestId, on处Success, onClose }) {
       });
 
       if (response.code === 200) {
-        on处Success();
+        onSuccess();
       } else {
         // Hiển thị thông báo lỗi từ Backend (như mã 1009: Yêu cầu đã đánh giá)
         showAlert('Thông báo', response.message || 'Không thể gửi đánh giá', 'warning');
@@ -72,6 +72,17 @@ export default function ReviewModal({ requestId, on处Success, onClose }) {
               >
                 <RotateCcw size={18} />
                 Yêu cầu làm lại
+              </button>
+              <button
+                type="button"
+                onClick={() => setOutcome('PARTIAL_ACCEPT')}
+                className={`flex items-center justify-center gap-2 p-3 rounded-xl border-2 transition-all font-bold text-sm ${outcome === 'PARTIAL_ACCEPT'
+                  ? 'border-emerald-600 bg-emerald-50 text-emerald-700'
+                  : 'border-gray-100 bg-gray-50 text-gray-500 hover:border-gray-200'
+                  }`}
+              >
+                <ShieldCheck size={18} />
+                Chấp nhận một phần
               </button>
             </div>
           </div>

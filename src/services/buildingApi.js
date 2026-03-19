@@ -20,26 +20,39 @@ export const deleteBuilding = async (id) => {
   return await apiClient.delete(`/buildings/${id}`);
 };
 
-export const generateApartments = async (id) => {
-  return await apiClient.post(`/buildings/${id}/generate-apartments`);
-};
-
 export const getBuildingByResidentEmail = async (email) => {
-  return await apiClient.get(`/buildings/resident/${email}`);
+  return await apiClient.get(`/buildings/${email}`);
+}
+
+// export const deleteBuilding = async (id, token) => {
+//   const res = await fetch(`${BASE_URL}/buildings/${id}`, {
+//     method: "DELETE",
+//     headers: getHeaders(token),
+//   });
+//   return await res.json();
+// };
+
+export const createBuilding = async (data, token) => {
+  const res = await fetch(`${BASE_URL}/buildings`, {
+    method: "POST",
+    headers: getHeaders(token),
+    body: JSON.stringify(data),
+  });
+  return await res.json();
 };
 
-export const fetchAllBuildings = async () => {
-  return await apiClient.get("/buildings/all");
+export const generateApartments = async (id, token) => {
+  const res = await fetch(`${BASE_URL}/buildings/${id}/generate-apartments`, {
+    method: "POST",
+    headers: getHeaders(token),
+  });
+  return await res.json();
 };
 
-export const createBuilding = async (data) => {
-  return await apiClient.post("/buildings", data);
-};
-
-export const getBuildingById = async (id) => {
-  return await apiClient.get(`/buildings/${id}`);
-};
-
-export const updateBuilding = async (id, data) => {
-  return await apiClient.put(`/buildings/${id}`, data);
-};
+// Các hàm khác (nếu cần bảo mật thì thêm token tương tự)
+export const fetchBuildingById = async (id, token) => {
+  const res = await fetch(`${BASE_URL}/buildings/${id}`, {
+    headers: getHeaders(token),
+  });
+  return await res.json();
+}
