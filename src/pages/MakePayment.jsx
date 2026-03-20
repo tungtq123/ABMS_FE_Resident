@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, FileDown } from "lucide-react";
+import { exportBillPdf } from "../utils/exportBillPdf";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { createPayment } from "../services/paymentService";
 import { fetchMaintenanceQuotations } from "../services/maintenanceQuotationService";
@@ -134,6 +135,16 @@ export default function MakePayment() {
 
         {/* Spacer */}
         <div className="flex-1" />
+
+        {/* Export PDF button */}
+        <button
+          onClick={() => exportBillPdf(bill, displayItems, displayAmount)}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-200 hover:bg-indigo-100 hover:border-indigo-300 transition-all text-sm font-semibold"
+        >
+          <FileDown className="w-4 h-4" />
+          Xuất PDF
+        </button>
+
 
         {/* Status badge */}
         <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-orange-50 text-orange-600 border border-orange-200">
