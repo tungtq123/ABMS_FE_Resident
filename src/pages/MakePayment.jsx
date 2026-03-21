@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
-import { ArrowLeft } from "lucide-react";
-import { useParams, useNavigate } from "react-router-dom";
+import { ArrowLeft, FileDown } from "lucide-react";
+import { exportBillPdf } from "../utils/exportBillPdf";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { createPayment } from "../services/paymentService";
+import { fetchMaintenanceQuotations } from "../services/maintenanceQuotationService";
 import BillInfoCard from "../components/payment/BillInfoCard";
 import AmountCard from "../components/payment/AmountCard";
 import ChargeDetailCard from "../components/payment/ChargeDetailCard";
@@ -17,9 +19,13 @@ import { getBillDetails } from "../services/billService";
 export default function MakePayment() {
   const { billId } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const maintenanceRequestId = searchParams.get("maintenanceRequestId");
+  const maintenanceRequestCode = searchParams.get("maintenanceRequestCode");
 
   const [bill, setBill] = useState(null);
   const [payment, setPayment] = useState(null);
+  const [quotationItems, setQuotationItems] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // const [selectedFile, setSelectedFile] = useState(null);
@@ -31,7 +37,14 @@ export default function MakePayment() {
     const init = async () => {
       try {
         const billData = await getBillDetails(billId);
-        const paymentData = await createPayment(billId);
+        const paymentData = await createPayment(billId, maintenanceRequestId || undefined);
+        if (maintenanceRequestId) {
+          const quotationRes = await fetchMaintenanceQuotations(maintenanceRequestId, true);
+          const approvedQuotation = (quotationRes?.result || []).find((q) => q.status === "APPROVED");
+          setQuotationItems(approvedQuotation?.items || []);
+        } else {
+          setQuotationItems([]);
+        }
         setBill(billData.result);
         setPayment(paymentData.result);
       } catch (err) {
@@ -41,7 +54,32 @@ export default function MakePayment() {
       }
     };
     init();
-  }, [billId]);
+  }, [billId, maintenanceRequestId]);
+
+  const maintenanceItems = (bill?.details || []).filter((item) => {
+    if (!maintenanceRequestId) return true;
+    if (!maintenanceRequestCode) return true;
+    const desc = (item?.description || "").toLowerCase();
+    return desc.includes(maintenanceRequestCode.toLowerCase());
+  });
+
+  const quotationDetailItems = quotationItems.map((item) => {
+    const quantity = Number(item?.quantity || 0);
+    const unitPrice = Number(item?.unitPrice || 0);
+    return {
+      description: item?.description || item?.name || "Hạng mục bảo trì",
+      quantity,
+      unitPrice,
+      totalLine: quantity * unitPrice,
+    };
+  });
+
+  const displayItems = maintenanceRequestId
+    ? (quotationDetailItems.length > 0 ? quotationDetailItems : maintenanceItems)
+    : (bill?.details || []);
+  const displayAmount = maintenanceRequestId
+    ? (payment?.amount || maintenanceItems.reduce((sum, item) => sum + Number(item?.totalLine || item?.unitPrice || 0), 0))
+    : bill?.totalAmount;
 
   // const handleFileSelect = (e) => {
   //   const file = e.target.files[0];
@@ -84,13 +122,29 @@ export default function MakePayment() {
         <div className="flex items-center gap-3">
           <div className="w-1 h-10 bg-blue-600 rounded-full" />
           <div>
-            <h1 className="text-lg font-bold text-gray-900 leading-tight">Thanh toán hóa đơn</h1>
-            <p className="text-xs text-gray-400">Hoàn tất thanh toán hóa đơn của bạn</p>
+            <h1 className="text-lg font-bold text-gray-900 leading-tight">
+              {maintenanceRequestId ? "Thanh toán phiếu bảo trì" : "Thanh toán hóa đơn"}
+            </h1>
+            <p className="text-xs text-gray-400">
+              {maintenanceRequestId
+                ? "Chỉ thanh toán khoản phí bảo trì của yêu cầu này"
+                : "Hoàn tất thanh toán hóa đơn của bạn"}
+            </p>
           </div>
         </div>
 
         {/* Spacer */}
         <div className="flex-1" />
+
+        {/* Export PDF button */}
+        <button
+          onClick={() => exportBillPdf(bill, displayItems, displayAmount)}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-200 hover:bg-indigo-100 hover:border-indigo-300 transition-all text-sm font-semibold"
+        >
+          <FileDown className="w-4 h-4" />
+          Xuất PDF
+        </button>
+
 
         {/* Status badge */}
         <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-orange-50 text-orange-600 border border-orange-200">
@@ -104,8 +158,8 @@ export default function MakePayment() {
         {/* Left Column */}
         <div className="space-y-6">
           <BillInfoCard bill={bill} />
-          <AmountCard totalAmount={bill?.totalAmount} />
-          <ChargeDetailCard items={bill?.details} />
+          <AmountCard totalAmount={displayAmount} />
+          <ChargeDetailCard items={displayItems} />
         </div>
 
         {/* Right Column */}

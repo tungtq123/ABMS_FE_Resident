@@ -1,21 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  Wrench,
   ArrowLeft,
   Calendar,
   Clock,
   User,
   Building,
+  MapPin,
   AlertCircle,
   CheckCircle2,
-  XCircle,
   MessageSquare,
   FileText,
   DollarSign,
   Loader2,
-  Camera,
-  History
+  History,
+  X,
+  Check
 } from 'lucide-react';
 import {
   fetchMaintenanceRequestDetail,
@@ -29,12 +29,38 @@ import {
   fetchSchedules,
   respondToSchedule,
   fetchMaintenanceProgress,
-  fetchMaintenanceLogs
+  fetchMaintenanceLogs,
+  fetchMaintenanceResources
 } from '../services/maintenanceWorkflowService';
+import { fetchMaintenancePayableBill } from '../services/billService';
+import { mapResourcePreview } from '../utils/resourcePreview';
 import StatusBadge from '../components/maintenance/StatusBadge';
 import ReviewModal from "../components/maintenance/ReviewModal";
 import ScheduleModal from "../components/maintenance/ScheduleModal";
 import { Edit2, Trash2 } from 'lucide-react';
+import toast from 'react-hot-toast';
+
+const QUOTATION_STATUS_MAP = {
+  DRAFT: 'Nháp',
+  SENT: 'Đã gửi',
+  APPROVED: 'Đã duyệt',
+  REJECTED: 'Bị từ chối',
+  CANCELLED: 'Đã hủy',
+  EXPIRED: 'Hết hạn'
+};
+
+const PRIORITY_LABEL_MAP = {
+  LOW: 'Thấp',
+  NORMAL: 'Bình thường',
+  MEDIUM: 'Trung bình',
+  HIGH: 'Cao',
+  CRITICAL: 'Khẩn cấp',
+};
+
+const SCOPE_LABEL_MAP = {
+  PUBLIC: 'Công cộng',
+  PRIVATE: 'Riêng tư',
+};
 
 export default function MaintenanceDetail() {
   const { id } = useParams();
@@ -43,12 +69,24 @@ export default function MaintenanceDetail() {
   const [quotations, setQuotations] = useState([]);
   const [schedules, setSchedules] = useState([]);
   const [progress, setProgress] = useState([]);
+  const [resources, setResources] = useState([]);
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('detail');
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [counterTargetSchedule, setCounterTargetSchedule] = useState(null);
+  const [counterTime, setCounterTime] = useState('');
+  const [counterDuration, setCounterDuration] = useState(60);
+  const [counterNote, setCounterNote] = useState('');
+  const [quotationActionLoading, setQuotationActionLoading] = useState(false);
+  const [actingQuotationId, setActingQuotationId] = useState(null);
+  const [payableBill, setPayableBill] = useState(null);
+  const [payableBillLoading, setPayableBillLoading] = useState(false);
+  // Schedule action loading states
+  const [scheduleActionLoading, setScheduleActionLoading] = useState(false);
+  const [actingScheduleId, setActingScheduleId] = useState(null);
 
   useEffect(() => {
     loadAllData();
@@ -57,18 +95,57 @@ export default function MaintenanceDetail() {
   const loadAllData = async () => {
     try {
       setLoading(true);
-      const [reqRes, quoRes, schRes, proRes, logRes] = await Promise.all([
-        fetchMaintenanceRequestDetail(id),
-        fetchMaintenanceQuotations(id),
+      const reqRes = await fetchMaintenanceRequestDetail(id);
+      if (reqRes.code !== 200) {
+        throw new Error('Cannot load maintenance request detail');
+      }
+
+      const requestData = reqRes.result;
+      setRequest(requestData);
+
+      if (requestData?.scope === 'PRIVATE' && requestData?.requestStatus === 'RESIDENT_ACCEPTED') {
+        setPayableBillLoading(true);
+        try {
+          const billRes = await fetchMaintenancePayableBill(id);
+          if (billRes.code === 200) {
+            setPayableBill(billRes.result || null);
+          } else {
+            setPayableBill(null);
+          }
+        } catch (billErr) {
+          setPayableBill(null);
+          console.error('Cannot load payable bill for maintenance request', billErr);
+        } finally {
+          setPayableBillLoading(false);
+        }
+      } else {
+        setPayableBill(null);
+        setPayableBillLoading(false);
+      }
+
+      if (requestData?.scope === 'PUBLIC') {
+        // Public requests in resident view are status-only.
+        setQuotations([]);
+        setSchedules([]);
+        setProgress([]);
+        setResources([]);
+        setLogs([]);
+        setActiveTab('detail');
+        return;
+      }
+
+      const [quoRes, schRes, proRes, resRes, logRes] = await Promise.all([
+        fetchMaintenanceQuotations(id, true),
         fetchSchedules(id),
         fetchMaintenanceProgress(id),
+        fetchMaintenanceResources(id),
         fetchMaintenanceLogs(id)
       ]);
 
-      if (reqRes.code === 200) setRequest(reqRes.result);
       if (quoRes.code === 200) setQuotations(quoRes.result);
       if (schRes.code === 200) setSchedules(schRes.result);
       if (proRes.code === 200) setProgress(proRes.result);
+      if (resRes.code === 200) setResources(resRes.result);
       if (logRes.code === 200) setLogs(logRes.result);
     } catch (err) {
       setError('Không thể tải thông tin chi tiết');
@@ -86,36 +163,74 @@ export default function MaintenanceDetail() {
           loadAllData();
         }
       } catch (err) {
-        alert('Có lỗi xảy ra khi hủy yêu cầu');
+        toast.error('Có lỗi xảy ra khi hủy yêu cầu');
       }
     }
   };
 
   const handleQuotationResponse = async (qId, status) => {
+    const message = status === 'APPROVED'
+      ? 'Bạn xác nhận đồng ý báo giá này?'
+      : 'Bạn xác nhận từ chối báo giá này?';
+
+    if (!window.confirm(message)) return;
+
+    setQuotationActionLoading(true);
+    setActingQuotationId(qId);
     try {
       const res = await respondToQuotation(qId, status);
       if (res.code === 200) {
         loadAllData();
       }
     } catch (err) {
-      alert('Có lỗi xảy ra khi xử lý báo giá');
+      toast.error('Có lỗi xảy ra khi xử lý báo giá');
+    } finally {
+      setQuotationActionLoading(false);
+      setActingQuotationId(null);
     }
   };
 
-  const handleScheduleResponse = async (sId, action) => {
+  const handleScheduleResponse = async (sId, action, extraPayload = {}) => {
+    const confirmMessages = {
+      'ACCEPT': 'Bạn xác nhận chấp nhận lịch này?',
+      'REJECT': 'Bạn xác nhận từ chối lịch này?'
+    };
+
+    if (confirmMessages[action] && !window.confirm(confirmMessages[action])) return;
+
+    setScheduleActionLoading(true);
+    setActingScheduleId(sId);
     try {
-      const res = await respondToSchedule(id, sId, { action });
+      const res = await respondToSchedule(id, sId, { action, ...extraPayload });
       if (res.code === 200) {
+        if (action === 'ACCEPT') toast.success('Bạn đã xác nhận lịch thành công');
+        if (action === 'REJECT') toast.success('Bạn đã từ chối lịch đề xuất');
         loadAllData();
+        setTimeout(() => {
+          const el = document.getElementById(`schedule-card-${sId}`);
+          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 250);
       }
     } catch (err) {
-      alert('Có lỗi xảy ra khi xử lý lịch');
+      toast.error('Có lỗi xảy ra khi xử lý lịch');
+    } finally {
+      setScheduleActionLoading(false);
+      setActingScheduleId(null);
     }
   };
 
   const formatDate = (dateString) => {
     if (!dateString) return '---';
     return new Date(dateString).toLocaleString('vi-VN');
+  };
+
+  const getQuotationTotal = (quotation) => {
+    if (!quotation) return 0;
+    if (typeof quotation.totalAmount === 'number') return quotation.totalAmount;
+    return (quotation.items || []).reduce(
+      (sum, item) => sum + Number(item.unitPrice || 0) * Number(item.quantity || 0),
+      0
+    );
   };
 
   if (loading) {
@@ -138,7 +253,68 @@ export default function MaintenanceDetail() {
   }
 
   const latestQuotation = quotations.find(q => q.status === 'SENT');
-  const latestSchedule = schedules.find(s => s.status === 'PROPOSED');
+  const isPublicViewOnly = request.scope === 'PUBLIC';
+  const resourcePreviews = resources
+    .map(mapResourcePreview)
+    .filter((item) => item.resolvedUrl && item.isImage);
+  // Schedule logic: filter for staff-proposed schedules
+  const latestScheduleFromStaff = schedules.find(s => s.status === 'PROPOSED' && s.proposedByRole === 'STAFF');
+  // Resident can propose schedule in all statuses allowed by backend.
+  const canResidentProposeSchedule = ['APPROVED', 'IN_PROGRESS'].includes(request.requestStatus);
+
+  const openCounterSchedule = (scheduleId) => {
+    setCounterTargetSchedule(scheduleId);
+    setCounterTime('');
+    setCounterDuration(60);
+    setCounterNote('');
+  };
+
+  const closeCounterSchedule = () => {
+    setCounterTargetSchedule(null);
+    setCounterTime('');
+    setCounterDuration(60);
+    setCounterNote('');
+  };
+
+  const handleCounterPropose = async (e) => {
+    e.preventDefault();
+    if (!counterTargetSchedule || !counterTime) return;
+
+    try {
+      const res = await respondToSchedule(id, counterTargetSchedule, {
+        action: 'COUNTER_PROPOSE',
+        counterProposedTime: counterTime,
+        counterEstimatedDuration: Number(counterDuration),
+        note: counterNote
+      });
+
+      if (res.code === 200) {
+        toast.success('Đã gửi đề xuất lịch mới');
+        const targetId = counterTargetSchedule;
+        closeCounterSchedule();
+        loadAllData();
+        setTimeout(() => {
+          const el = document.getElementById(`schedule-card-${targetId}`);
+          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 250);
+      }
+    } catch (err) {
+      toast.error('Có lỗi xảy ra khi đề xuất lại lịch');
+    }
+  };
+
+  // Schedule status badge mapping
+  const scheduleStatusConfig = {
+    'PROPOSED': { label: 'Đề xuất', color: 'bg-yellow-100 text-yellow-700' },
+    'CONFIRMED': { label: 'Xác nhận', color: 'bg-green-100 text-green-700' },
+    'REJECTED': { label: 'Từ chối', color: 'bg-red-100 text-red-700' },
+    'COUNTER_PROPOSED': { label: 'Đề xuất lại', color: 'bg-blue-100 text-blue-700' },
+    'CANCELLED': { label: 'Hủy', color: 'bg-gray-100 text-gray-700' }
+  };
+
+  const getScheduleStatusConfig = (status) => {
+    return scheduleStatusConfig[status] || { label: status, color: 'bg-gray-100 text-gray-700' };
+  };
 
   return (
     <div className="min-h-screen bg-gray-50/50 pb-20">
@@ -162,7 +338,7 @@ export default function MaintenanceDetail() {
           </div>
 
           <div className="flex gap-2">
-            {['PENDING', 'VERIFYING'].includes(request.requestStatus) && (
+            {!isPublicViewOnly && ['PENDING', 'VERIFYING'].includes(request.requestStatus) && (
               <>
                 <button
                   onClick={() => navigate(`/maintenance/edit/${id}`)}
@@ -188,9 +364,9 @@ export default function MaintenanceDetail() {
           {[
             { id: 'detail', label: 'Chi tiết', icon: FileText },
             { id: 'quotation', label: 'Báo giá', icon: DollarSign, count: quotations.length },
+            { id: 'schedule', label: 'Lịch sửa', icon: Calendar, count: schedules.length },
             { id: 'progress', label: 'Tiến độ', icon: History, count: progress.length },
-            { id: 'logs', label: 'Nhật ký', icon: MessageSquare }
-          ].map((tab) => (
+          ].filter((tab) => !isPublicViewOnly || tab.id === 'detail').map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
@@ -220,7 +396,7 @@ export default function MaintenanceDetail() {
           {activeTab === 'detail' && (
             <>
               {/* Resident Action: Review (COMPLETED status) */}
-              {request.requestStatus === 'COMPLETED' && (
+              {!isPublicViewOnly && request.requestStatus === 'COMPLETED' && (
                 <div className="bg-green-50 border border-green-100 rounded-2xl p-6 shadow-sm mb-8 animate-pulse-slow">
                   <div className="flex items-center gap-3 mb-4">
                     <div className="w-10 h-10 bg-green-600 rounded-xl flex items-center justify-center text-white">
@@ -240,8 +416,43 @@ export default function MaintenanceDetail() {
                 </div>
               )}
 
-              {/* Resident Action: Propose Schedule (APPROVED status) */}
-              {request.requestStatus === 'APPROVED' && !latestSchedule && (
+              {!isPublicViewOnly && request.requestStatus === 'RESIDENT_ACCEPTED' && (
+                <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-6 shadow-sm mb-8">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white">
+                      <DollarSign size={20} />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-indigo-900">Thanh toán trực tuyến</h3>
+                      <p className="text-xs text-indigo-600 font-medium">Yêu cầu đã nghiệm thu và đánh giá xong. Bạn có thể thanh toán online.</p>
+                    </div>
+                  </div>
+
+                  {payableBillLoading && (
+                    <p className="text-sm text-indigo-700 font-medium">Đang kiểm tra hóa đơn liên quan...</p>
+                  )}
+
+                  {!payableBillLoading && payableBill && payableBill.status !== 'PAID' && (
+                    <button
+                      onClick={() => navigate(`/payment/${payableBill.id}?maintenanceRequestId=${id}&maintenanceRequestCode=${encodeURIComponent(request.code || '')}`)}
+                      className="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold text-sm shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all active:scale-95"
+                    >
+                      Thanh toán online ngay
+                    </button>
+                  )}
+
+                  {!payableBillLoading && payableBill?.status === 'PAID' && (
+                    <p className="text-sm font-bold text-green-700">Yêu cầu này đã được thanh toán.</p>
+                  )}
+
+                  {!payableBillLoading && !payableBill && (
+                    <p className="text-sm text-amber-700 font-medium">Hóa đơn đang được đồng bộ, vui lòng thử lại sau ít phút.</p>
+                  )}
+                </div>
+              )}
+
+              {/* Resident Action: Propose Schedule (for APPROVED requests without pending staff proposal) */}
+              {!isPublicViewOnly && canResidentProposeSchedule && (
                 <div className="bg-blue-50 border border-blue-100 rounded-2xl p-6 shadow-sm mb-8">
                   <div className="flex items-center gap-3 mb-4">
                     <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white">
@@ -269,8 +480,47 @@ export default function MaintenanceDetail() {
                 </p>
               </div>
 
+              {!isPublicViewOnly && resourcePreviews.length > 0 && (
+                <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+                  <h3 className="text-sm font-black text-gray-400 uppercase tracking-widest mb-4">Tài nguyên đính kèm</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    {resourcePreviews.map((resource) => (
+                      <a
+                        key={resource.id}
+                        href={resource.resolvedUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="relative block border border-gray-200 rounded-xl overflow-hidden hover:opacity-90 transition"
+                      >
+                        <span
+                          className={`absolute top-2 left-2 z-10 px-2 py-0.5 rounded-full text-[10px] font-bold text-white ${
+                            resource.uploaderRole === "STAFF"
+                              ? "bg-sky-700/90"
+                              : resource.uploaderRole === "RESIDENT"
+                                ? "bg-emerald-700/90"
+                                : "bg-gray-700/85"
+                          }`}
+                        >
+                          {resource.uploaderRole === 'STAFF'
+                            ? 'Nhân viên'
+                            : resource.uploaderRole === 'RESIDENT'
+                              ? 'Cư dân'
+                              : 'Không rõ'}
+                        </span>
+                        <img
+                          src={resource.resolvedUrl}
+                          alt="maintenance"
+                          className="w-full h-36 object-cover"
+                          loading="lazy"
+                        />
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Resident Action: Quotation */}
-              {latestQuotation && (
+              {!isPublicViewOnly && latestQuotation && (
                 <div className="bg-purple-50 border border-purple-100 rounded-2xl p-6 shadow-sm">
                   <div className="flex items-center gap-3 mb-4">
                     <div className="w-10 h-10 bg-purple-600 rounded-xl flex items-center justify-center text-white">
@@ -284,29 +534,23 @@ export default function MaintenanceDetail() {
                   <div className="bg-white rounded-xl p-4 mb-4 border border-purple-100">
                     <div className="flex justify-between items-center mb-2">
                       <span className="text-sm font-bold text-gray-900">{latestQuotation.title}</span>
-                      <span className="text-lg font-black text-blue-600">{latestQuotation.totalAmount?.toLocaleString()} đ</span>
+                      <span className="text-lg font-black text-blue-600">{getQuotationTotal(latestQuotation).toLocaleString('vi-VN')} đ</span>
                     </div>
                     <p className="text-xs text-gray-500 line-clamp-2">{latestQuotation.note}</p>
                   </div>
                   <div className="flex gap-3">
                     <button
-                      onClick={() => handleQuotationResponse(latestQuotation.id, 'APPROVED')}
+                      onClick={() => setActiveTab('quotation')}
                       className="flex-1 bg-purple-600 text-white py-2.5 rounded-lg font-bold text-sm shadow-md hover:bg-purple-700 transition-all"
                     >
-                      Đồng ý báo giá
-                    </button>
-                    <button
-                      onClick={() => handleQuotationResponse(latestQuotation.id, 'REJECTED')}
-                      className="flex-1 bg-white text-purple-600 border border-purple-200 py-2.5 rounded-lg font-bold text-sm hover:bg-purple-50 transition-all"
-                    >
-                      Từ chối
+                      Vào báo giá
                     </button>
                   </div>
                 </div>
               )}
 
-              {/* Resident Action: Schedule */}
-              {latestSchedule && latestSchedule.proposedByRole === 'STAFF' && (
+              {/* Resident Action: Approved Schedule (navigate to schedule tab) */}
+              {!isPublicViewOnly && ['APPROVED', 'IN_PROGRESS'].includes(request.requestStatus) && latestScheduleFromStaff && (
                 <div className="bg-blue-50 border border-blue-100 rounded-2xl p-6 shadow-sm">
                   <div className="flex items-center gap-3 mb-4">
                     <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white">
@@ -321,34 +565,134 @@ export default function MaintenanceDetail() {
                     <div className="flex items-center gap-4 text-sm font-bold text-gray-900">
                       <div className="flex items-center gap-1.5">
                         <Calendar size={16} className="text-blue-600" />
-                        {new Date(latestSchedule.proposedTime).toLocaleDateString('vi-VN')}
+                        {new Date(latestScheduleFromStaff.proposedTime).toLocaleDateString('vi-VN')}
                       </div>
                       <div className="flex items-center gap-1.5">
                         <Clock size={16} className="text-blue-600" />
-                        {new Date(latestSchedule.proposedTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                        {new Date(latestScheduleFromStaff.proposedTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
                       </div>
                     </div>
-                    {latestSchedule.note && (
-                      <p className="text-xs text-gray-500 mt-2 italic">"{latestSchedule.note}"</p>
+                    {latestScheduleFromStaff.note && (
+                      <p className="text-xs text-gray-500 mt-2 italic">"{latestScheduleFromStaff.note}"</p>
                     )}
                   </div>
-                  <div className="flex gap-3">
-                    <button
-                      onClick={() => handleScheduleResponse(latestSchedule.id, 'ACCEPT')}
-                      className="flex-1 bg-blue-600 text-white py-2.5 rounded-lg font-bold text-sm shadow-md hover:bg-blue-700 transition-all"
-                    >
-                      Xác nhận lịch
-                    </button>
-                    <button
-                      onClick={() => handleScheduleResponse(latestSchedule.id, 'REJECT')}
-                      className="flex-1 bg-white text-blue-600 border border-blue-200 py-2.5 rounded-lg font-bold text-sm hover:bg-blue-50 transition-all"
-                    >
-                      Đổi lịch khác
-                    </button>
-                  </div>
+                  <button
+                    onClick={() => setActiveTab('schedule')}
+                    className="w-full bg-blue-600 text-white py-2.5 rounded-lg font-bold text-sm shadow-md hover:bg-blue-700 transition-all"
+                  >
+                    Vào lịch sửa
+                  </button>
                 </div>
               )}
             </>
+          )}
+
+          {activeTab === 'schedule' && (
+            <div className="space-y-6">
+              {/* Top Propose Button */}
+              {canResidentProposeSchedule && (
+                <button
+                  onClick={() => setShowScheduleModal(true)}
+                  className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold text-sm shadow-md hover:bg-blue-700 transition-all flex items-center justify-center gap-2"
+                >
+                  <Calendar size={18} />
+                  Đề xuất lịch sửa chữa
+                </button>
+              )}
+
+              {/* Schedules List */}
+              {schedules.length > 0 ? (
+                <div className="space-y-4">
+                  {schedules.map((s) => {
+                    const statusConfig = getScheduleStatusConfig(s.status);
+                    return (
+                      <div id={`schedule-card-${s.id}`} key={s.id} className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+                        <div className="flex justify-between items-start mb-3">
+                          <div>
+                            <p className="text-sm font-bold text-gray-900">
+                              {formatDate(s.proposedTime)}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              Đề xuất bởi: {s.proposedByRole === 'STAFF' ? 'Nhân viên' : 'Cư dân'}
+                            </p>
+                          </div>
+                          <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${statusConfig.color}`}>
+                            {statusConfig.label}
+                          </span>
+                        </div>
+
+                        {s.estimatedDuration && (
+                          <p className="text-xs text-gray-500 mb-1">Dự kiến: {s.estimatedDuration} phút</p>
+                        )}
+                        {s.note && (
+                          <p className="text-sm text-gray-600 italic mb-4">"{s.note}"</p>
+                        )}
+
+                        {/* Staff Proposal: Resident can accept/reject/counter */}
+                        {s.status === 'PROPOSED' && s.proposedByRole === 'STAFF' && (
+                          <div className="flex gap-3">
+                            <button
+                              onClick={() => handleScheduleResponse(s.id, 'ACCEPT')}
+                              disabled={scheduleActionLoading && actingScheduleId === s.id}
+                              className="flex-1 bg-green-600 text-white py-2.5 rounded-lg font-bold text-sm shadow-md hover:bg-green-700 transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                            >
+                              {scheduleActionLoading && actingScheduleId === s.id ? (
+                                <>
+                                  <Loader2 size={16} className="animate-spin" />
+                                  Đang xử lý
+                                </>
+                              ) : (
+                                <>
+                                  <Check size={16} />
+                                  Xác nhận
+                                </>
+                              )}
+                            </button>
+                            <button
+                              onClick={() => handleScheduleResponse(s.id, 'REJECT')}
+                              disabled={scheduleActionLoading && actingScheduleId === s.id}
+                              className="flex-1 bg-red-600 text-white py-2.5 rounded-lg font-bold text-sm shadow-md hover:bg-red-700 transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                            >
+                              {scheduleActionLoading && actingScheduleId === s.id ? (
+                                <>
+                                  <Loader2 size={16} className="animate-spin" />
+                                  Đang xử lý
+                                </>
+                              ) : (
+                                <>
+                                  <X size={16} />
+                                  Từ chối
+                                </>
+                              )}
+                            </button>
+                            <button
+                              onClick={() => openCounterSchedule(s.id)}
+                              disabled={scheduleActionLoading && actingScheduleId === s.id}
+                              className="flex-1 bg-blue-600 text-white py-2.5 rounded-lg font-bold text-sm shadow-md hover:bg-blue-700 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                            >
+                              Đề xuất lại
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Resident Proposal: Waiting for staff response */}
+                        {s.status === 'PROPOSED' && s.proposedByRole === 'RESIDENT' && (
+                          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-center">
+                            <p className="text-sm text-blue-700 font-medium">
+                              ⏳ Đang chờ nhân viên phản hồi lịch đề xuất của bạn
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="bg-white rounded-2xl p-12 text-center border border-dashed border-gray-200 text-gray-400">
+                  Chưa có lịch sửa chữa nào
+                </div>
+              )}
+            </div>
           )}
 
           {activeTab === 'quotation' && (
@@ -365,7 +709,7 @@ export default function MaintenanceDetail() {
                       q.status === 'REJECTED' ? 'bg-red-100 text-red-700' :
                       'bg-gray-100 text-gray-600'
                     }`}>
-                      {q.status}
+                      {QUOTATION_STATUS_MAP[q.status] || q.status}
                     </span>
                   </div>
                   <div className="space-y-2 mb-4">
@@ -378,8 +722,27 @@ export default function MaintenanceDetail() {
                   </div>
                   <div className="pt-4 border-t border-dashed border-gray-100 flex justify-between items-center">
                     <span className="text-sm font-bold text-gray-900">Tổng cộng</span>
-                    <span className="text-lg font-black text-blue-600">{q.totalAmount?.toLocaleString()} đ</span>
+                    <span className="text-lg font-black text-blue-600">{getQuotationTotal(q).toLocaleString('vi-VN')} đ</span>
                   </div>
+
+                  {q.status === 'SENT' && (
+                    <div className="mt-4 flex gap-3">
+                      <button
+                        disabled={quotationActionLoading && actingQuotationId === q.id}
+                        onClick={() => handleQuotationResponse(q.id, 'APPROVED')}
+                        className="flex-1 bg-purple-600 text-white py-2.5 rounded-lg font-bold text-sm shadow-md hover:bg-purple-700 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                      >
+                        {quotationActionLoading && actingQuotationId === q.id ? 'Đang xử lý...' : 'Đồng ý báo giá'}
+                      </button>
+                      <button
+                        disabled={quotationActionLoading && actingQuotationId === q.id}
+                        onClick={() => handleQuotationResponse(q.id, 'REJECTED')}
+                        className="flex-1 bg-white text-purple-600 border border-purple-200 py-2.5 rounded-lg font-bold text-sm hover:bg-purple-50 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                      >
+                        {quotationActionLoading && actingQuotationId === q.id ? 'Đang xử lý...' : 'Từ chối'}
+                      </button>
+                    </div>
+                  )}
                 </div>
               )) : (
                 <div className="bg-white rounded-2xl p-12 text-center border border-dashed border-gray-200 text-gray-400">
@@ -427,13 +790,17 @@ export default function MaintenanceDetail() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {logs.map(log => (
+                  {logs.length > 0 ? logs.map(log => (
                     <tr key={log.id} className="text-sm">
                       <td className="px-6 py-4 text-gray-400">{formatDate(log.createdAt)}</td>
                       <td className="px-6 py-4 font-bold text-gray-700">{log.action}</td>
-                      <td className="px-6 py-4 text-gray-500">{log.actorName || 'Hệ thống'}</td>
+                      <td className="px-6 py-4 text-gray-500">{log.actorName || (log.actorId ? 'Người dùng' : 'Hệ thống')}</td>
                     </tr>
-                  ))}
+                  )) : (
+                    <tr>
+                      <td className="px-6 py-8 text-center text-gray-400" colSpan={3}>Chưa có nhật ký xử lý</td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -451,8 +818,21 @@ export default function MaintenanceDetail() {
                   <Building size={16} />
                 </div>
                 <div>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Căn hộ</p>
-                  <p className="text-sm font-bold text-gray-900">{request.apartmentCode} - {request.buildingName}</p>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{isPublicViewOnly ? 'Tòa nhà' : 'Căn hộ'}</p>
+                  <p className="text-sm font-bold text-gray-900">
+                    {isPublicViewOnly
+                      ? `${request.buildingName || 'Không rõ'}`
+                      : `${request.apartmentCode} - ${request.buildingName}`}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-gray-50 rounded-lg flex items-center justify-center text-gray-400">
+                  <MapPin size={16} />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Phạm vi</p>
+                  <p className="text-sm font-bold text-gray-900">{SCOPE_LABEL_MAP[request.scope] || request.scope || 'Không rõ'}</p>
                 </div>
               </div>
               <div className="flex items-center gap-3">
@@ -483,7 +863,7 @@ export default function MaintenanceDetail() {
                     request.priority === 'CRITICAL' ? 'text-red-600' :
                     request.priority === 'HIGH' ? 'text-orange-600' :
                     'text-blue-600'
-                  }`}>{request.priority}</p>
+                  }`}>{PRIORITY_LABEL_MAP[request.priority] || request.priority}</p>
                 </div>
               </div>
             </div>
@@ -532,6 +912,65 @@ export default function MaintenanceDetail() {
           }}
           onClose={() => setShowScheduleModal(false)}
         />
+      )}
+
+      {counterTargetSchedule && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+            <div className="p-6 border-b border-gray-100">
+              <h3 className="text-lg font-bold text-gray-900">Đề xuất lịch mới</h3>
+              <p className="text-xs text-gray-500 mt-1">Gửi phản hồi đề xuất lại cho lịch hiện tại</p>
+            </div>
+            <form onSubmit={handleCounterPropose} className="p-6 space-y-4">
+              <div>
+                <label className="text-sm font-bold text-gray-700 block mb-1">Thời gian đề xuất</label>
+                <input
+                  type="datetime-local"
+                  required
+                  value={counterTime}
+                  onChange={(e) => setCounterTime(e.target.value)}
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-bold text-gray-700 block mb-1">Thời lượng dự kiến (phút)</label>
+                <input
+                  type="number"
+                  min={15}
+                  step={15}
+                  value={counterDuration}
+                  onChange={(e) => setCounterDuration(e.target.value)}
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-bold text-gray-700 block mb-1">Ghi chú</label>
+                <textarea
+                  rows={3}
+                  value={counterNote}
+                  onChange={(e) => setCounterNote(e.target.value)}
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none resize-none"
+                  placeholder="Ví dụ: Tôi chỉ rảnh sau 18h"
+                />
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={closeCounterSchedule}
+                  className="flex-1 px-4 py-3 border border-gray-200 rounded-xl font-bold text-gray-600 hover:bg-gray-50"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700"
+                >
+                  Gửi đề xuất
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );

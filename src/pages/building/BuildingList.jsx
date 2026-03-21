@@ -6,6 +6,7 @@ import {
   MapPin, Eye, X
 } from "lucide-react";
 import { fetchBuildings, deleteBuilding, generateApartments } from "../../services/buildingApi"; 
+import toast from "react-hot-toast";
 
 export default function BuildingList() {
   const navigate = useNavigate();
@@ -67,7 +68,7 @@ export default function BuildingList() {
     if (!window.confirm("Bắt đầu sinh căn hộ?")) return;
     const res = await generateApartments(id, token); // Truyền token
     if (res.code === 200 || res.code === 201) {
-      alert("Thành công!");
+      toast.success("Thành công!");
       setShowModal(false);
       loadBuildings();
     }

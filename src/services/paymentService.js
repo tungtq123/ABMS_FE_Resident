@@ -4,8 +4,11 @@ export const fetchBillDetail = (billId) => {
   return apiClient.get(`/bill/${billId}`);
 };
 
-export const createPayment = (billId) => {
-  return apiClient.post(`/payments/${billId}`);
+export const createPayment = (billId, maintenanceRequestId) => {
+  const query = maintenanceRequestId
+    ? `?maintenanceRequestId=${encodeURIComponent(maintenanceRequestId)}`
+    : "";
+  return apiClient.post(`/payments/${billId}${query}`);
 };
 
 export const submitPayment = (billId, formData) => {

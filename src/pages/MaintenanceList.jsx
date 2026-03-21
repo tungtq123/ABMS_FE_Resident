@@ -12,23 +12,49 @@ import {
 } from 'lucide-react';
 import { fetchMaintenanceRequests } from '../services/maintenanceRequestService';
 import MaintenanceRequestCard from '../components/maintenance/MaintenanceRequestCard';
+import { useAuth } from '../context/AuthContext';
+
+const STATUS_OPTIONS = [
+  { value: 'PENDING', label: 'Chờ xử lý', tone: 'text-amber-600' },
+  { value: 'VERIFYING', label: 'Đang xác minh', tone: 'text-sky-600' },
+  { value: 'QUOTING', label: 'Đang báo giá', tone: 'text-orange-600' },
+  { value: 'WAITING_APPROVAL', label: 'Chờ duyệt báo giá', tone: 'text-violet-600' },
+  { value: 'APPROVED', label: 'Đã duyệt báo giá', tone: 'text-emerald-600' },
+  { value: 'IN_PROGRESS', label: 'Đang sửa chữa', tone: 'text-blue-600' },
+  { value: 'COMPLETED', label: 'Chờ nghiệm thu', tone: 'text-green-600' },
+  { value: 'RESIDENT_ACCEPTED', label: 'Đã nghiệm thu', tone: 'text-green-700' },
+  { value: 'CANCELLED', label: 'Đã hủy', tone: 'text-slate-600' },
+  { value: 'REJECTED', label: 'Từ chối', tone: 'text-red-600' },
+];
+
+const SCOPE_OPTIONS = [
+  { value: 'all', label: 'Tất cả phạm vi' },
+  { value: 'PRIVATE', label: 'Riêng tư' },
+  { value: 'PUBLIC', label: 'Công cộng' },
+];
 
 export default function MaintenanceList() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [filterScope, setFilterScope] = useState('all');
 
   useEffect(() => {
     loadRequests();
-  }, []);
+  }, [user?.id]);
 
   const loadRequests = async () => {
     try {
       setLoading(true);
-      const response = await fetchMaintenanceRequests({ pagination: false });
+      const params = { pagination: false };
+      if (user?.id) {
+        params.requesterId = user.id;
+      }
+      const response = await fetchMaintenanceRequests(params);
       if (response.code === 200) {
         setRequests(response.result);
       } else {
@@ -44,18 +70,28 @@ export default function MaintenanceList() {
 
   const filteredRequests = requests.filter(req => {
     const matchesStatus = filterStatus === 'all' || req.requestStatus === filterStatus;
+    const matchesScope = filterScope === 'all' || req.scope === filterScope;
     const matchesSearch =
-      req.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      req.code.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesStatus && matchesSearch;
+      req.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      req.code?.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesStatus && matchesScope && matchesSearch;
   });
 
-  const stats = {
-    total: requests.length,
-    pending: requests.filter(r => ['PENDING', 'VERIFYING', 'QUOTING', 'WAITING_APPROVAL'].includes(r.requestStatus)).length,
-    inProgress: requests.filter(r => r.requestStatus === 'IN_PROGRESS').length,
-    completed: requests.filter(r => r.requestStatus === 'RESIDENT_ACCEPTED').length,
-  };
+  const statusCounts = requests.reduce((accumulator, request) => {
+    const status = request.requestStatus;
+    accumulator[status] = (accumulator[status] || 0) + 1;
+    return accumulator;
+  }, {});
+
+  const stats = [
+    { key: 'TOTAL', label: 'Tổng số', value: requests.length, tone: 'text-slate-600' },
+    ...STATUS_OPTIONS.map((status) => ({
+      key: status.value,
+      label: status.label,
+      value: statusCounts[status.value] || 0,
+      tone: status.tone,
+    })),
+  ];
 
   if (loading) {
     return (
@@ -94,23 +130,13 @@ export default function MaintenanceList() {
 
       <div className="max-w-7xl mx-auto px-6 py-8">
         {/* Stats Summary */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
-            <p className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-1">Tổng số</p>
-            <p className="text-2xl font-black text-gray-900">{stats.total}</p>
-          </div>
-          <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
-            <p className="text-yellow-600 text-xs font-bold uppercase tracking-wider mb-1">Đang xử lý</p>
-            <p className="text-2xl font-black text-gray-900">{stats.pending}</p>
-          </div>
-          <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
-            <p className="text-blue-600 text-xs font-bold uppercase tracking-wider mb-1">Đang sửa</p>
-            <p className="text-2xl font-black text-gray-900">{stats.inProgress}</p>
-          </div>
-          <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
-            <p className="text-green-600 text-xs font-bold uppercase tracking-wider mb-1">Hoàn thành</p>
-            <p className="text-2xl font-black text-gray-900">{stats.completed}</p>
-          </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-3 mb-8">
+          {stats.map((stat) => (
+            <div key={stat.key} className="bg-white px-3 py-2.5 rounded-xl shadow-sm border border-gray-100">
+              <p className={`text-[10px] font-bold uppercase tracking-wide leading-4 ${stat.tone}`}>{stat.label}</p>
+              <p className="text-lg font-black text-gray-900 mt-1">{stat.value}</p>
+            </div>
+          ))}
         </div>
 
         {/* Filters */}
@@ -133,12 +159,21 @@ export default function MaintenanceList() {
               onChange={(e) => setFilterStatus(e.target.value)}
             >
               <option value="all">Tất cả trạng thái</option>
-              <option value="PENDING">Chờ xử lý</option>
-              <option value="WAITING_APPROVAL">Chờ duyệt báo giá</option>
-              <option value="IN_PROGRESS">Đang sửa chữa</option>
-              <option value="COMPLETED">Chờ nghiệm thu</option>
-              <option value="RESIDENT_ACCEPTED">Đã hoàn thành</option>
-              <option value="CANCELLED">Đã hủy</option>
+              {STATUS_OPTIONS.map((status) => (
+                <option key={status.value} value={status.value}>{status.label}</option>
+              ))}
+            </select>
+          </div>
+          <div className="relative md:w-56">
+            <Filter className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+            <select
+              className="w-full pl-11 pr-4 py-3 bg-gray-50 border-none rounded-xl focus:ring-2 focus:ring-blue-500/20 transition-all outline-none text-sm font-medium appearance-none cursor-pointer"
+              value={filterScope}
+              onChange={(e) => setFilterScope(e.target.value)}
+            >
+              {SCOPE_OPTIONS.map((scope) => (
+                <option key={scope.value} value={scope.value}>{scope.label}</option>
+              ))}
             </select>
           </div>
         </div>
