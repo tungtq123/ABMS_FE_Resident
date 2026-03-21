@@ -21,9 +21,9 @@ export const residentNav  = [
     badge: 3, // số hóa đơn chưa thanh toán
   },
   {
-    label: "Thanh toán",
+    label: "Lịch sử giao dịch",
     icon: CreditCard,
-    path: "/payments",
+    path: "transactions",
   },
   {
     label: "Thông báo",

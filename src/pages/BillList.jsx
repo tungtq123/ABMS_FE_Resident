@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { FileText } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { getBillsByUser } from '../services/billService';
 import BillStats from '../components/bills/BillStats';
@@ -8,10 +9,11 @@ import BillItem from '../components/bills/BillItem';
 
 export default function BillList() {
   const { user } = useContext(AuthContext);
+  const [searchParams] = useSearchParams();
   const [bills, setBills] = useState([]);
   const [periodCode, setPeriodCode] = useState('');
   const [apartmentCode, setApartmentCode] = useState('');
-  const [filterStatus, setFilterStatus] = useState('all');
+  const [filterStatus, setFilterStatus] = useState(() => searchParams.get('status') || 'all');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

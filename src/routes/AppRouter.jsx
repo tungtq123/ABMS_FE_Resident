@@ -1,6 +1,7 @@
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import MakePayment from "../pages/MakePayment";
 import BillDetail from "../pages/BillDetail";
+import TransactionHistory from "../pages/TransactionHistory";
 import BillList from "../pages/BillList";
 import Dashboard from "../pages/Dashboard";
 import MaintenanceList from "../pages/MaintenanceList";
@@ -34,6 +35,7 @@ const AppRouter = () => {
         { path: "payment/:billId", element: <MakePayment /> },
         { path: "bills/:billId", element: <BillDetail /> },
         { path: "payment/bill-list", element: <BillList /> },
+        { path: "transactions", element: <TransactionHistory /> },
         { path: "maintenance", element: <MaintenanceList /> },
         { path: "maintenance/create", element: <CreateMaintenanceRequest /> },
         { path: "maintenance/edit/:id", element: <EditMaintenanceRequest /> },

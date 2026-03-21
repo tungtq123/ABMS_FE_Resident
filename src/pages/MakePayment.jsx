@@ -118,24 +118,6 @@ export default function MakePayment() {
 
           <BankInfoCard bill={bill} />
 
-          {/* Reference + Upload side by side */}
-          {/* <div className="grid grid-cols-2 gap-4">
-            <ReferenceCard
-              referenceNumber={referenceNumber}
-              setReferenceNumber={setReferenceNumber}
-            />
-            <ReferenceUploadCard
-              selectedFile={selectedFile}
-              previewUrl={previewUrl}
-              onFileSelect={handleFileSelect}
-              onRemoveFile={handleRemoveFile}
-            />
-          </div> */}
-
-          <NoteCard note={note} setNote={setNote} />
-          <InfoNotice />
-          {/* <PaymentActions onConfirm={handleConfirm} onCancel={handleCancel} /> */}
-
           {bill?.status !== "PAID" && (
             <ReferenceUploadCard
               bill={bill}

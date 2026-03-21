@@ -122,7 +122,7 @@ const quickActions = [
     label: "Xem tất cả hóa đơn",
     icon: FileText,
     color: "bg-white hover:bg-gray-50 border border-gray-200 !text-gray-700",
-    path: "/bills",
+    path: "/payment/bill-list",
   },
   {
     label: "Yêu cầu sửa chữa",
@@ -320,7 +320,7 @@ export default function Dashboard() {
                 </h2>
               </div>
               <button
-                onClick={() => navigate("/bills")}
+                onClick={() => navigate("/payment/bill-list")}
                 className="flex items-center gap-1 text-xs text-blue-600 font-semibold hover:underline"
               >
                 Xem tất cả <ChevronRight className="w-3.5 h-3.5" />

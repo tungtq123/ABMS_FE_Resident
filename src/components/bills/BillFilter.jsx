@@ -44,7 +44,6 @@ export default function BillFilter({ periodCode, setPeriodCode, apartmentCode, s
               <option value="all">Tất cả hóa đơn</option>
               <option value="PAID">Đã thanh toán (PAID)</option>
               <option value="UNPAID">Chưa thanh toán (UNPAID)</option>
-              <option value="PARTIAL">Thanh toán một phần (PARTIAL)</option>
             </select>
           </div>
         </div>
