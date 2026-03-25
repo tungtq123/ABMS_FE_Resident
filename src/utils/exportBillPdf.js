@@ -4,6 +4,8 @@
  * Người dùng chọn "Save as PDF" trong hộp thoại in của trình duyệt.
  */
 
+import toast from "react-hot-toast";
+
 const fmtVND = (n) =>
   n != null
     ? new Intl.NumberFormat("vi-VN", { minimumFractionDigits: 0 }).format(n) + " ₫"
@@ -297,7 +299,7 @@ export function exportBillPdf(bill, displayItems = null, displayAmount = null) {
 
   const win = window.open("", "_blank", "width=900,height=700");
   if (!win) {
-    alert("Vui lòng cho phép popup để xuất PDF");
+    toast.error("Vui lòng cho phép popup để xuất PDF");
     return;
   }
   win.document.write(html);

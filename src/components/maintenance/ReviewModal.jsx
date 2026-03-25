@@ -1,18 +1,13 @@
 import React, { useState } from 'react';
 import { Star, Send, Loader2, RotateCcw, CheckCircle2, ShieldCheck } from 'lucide-react';
 import { submitMaintenanceReview } from '../../services/maintenanceWorkflowService';
-import AlertModal from '../common/AlertModal';
+import toast from 'react-hot-toast';
 
 export default function ReviewModal({ requestId, onSuccess, onClose }) {
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState('');
   const [outcome, setOutcome] = useState('ACCEPTED');
   const [loading, setLoading] = useState(false);
-  const [alertConfig, setAlertConfig] = useState({ isOpen: false, title: '', message: '', type: 'info' });
-
-  const showAlert = (title, message, type = 'info') => {
-    setAlertConfig({ isOpen: true, title, message, type });
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -28,11 +23,11 @@ export default function ReviewModal({ requestId, onSuccess, onClose }) {
         onSuccess();
       } else {
         // Hiển thị thông báo lỗi từ Backend (như mã 1009: Yêu cầu đã đánh giá)
-        showAlert('Thông báo', response.message || 'Không thể gửi đánh giá', 'warning');
+        toast(response.message || 'Không thể gửi đánh giá');
       }
     } catch (err) {
       console.error(err);
-      showAlert('Lỗi', 'Có lỗi xảy ra khi kết nối máy chủ', 'error');
+      toast.error('Có lỗi xảy ra khi kết nối máy chủ');
     } finally {
       setLoading(false);
     }
@@ -140,14 +135,6 @@ export default function ReviewModal({ requestId, onSuccess, onClose }) {
           </div>
         </form>
       </div>
-
-      <AlertModal
-        isOpen={alertConfig.isOpen}
-        title={alertConfig.title}
-        message={alertConfig.message}
-        type={alertConfig.type}
-        onClose={() => setAlertConfig({ ...alertConfig, isOpen: false })}
-      />
     </div>
   );
 }

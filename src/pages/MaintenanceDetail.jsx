@@ -32,13 +32,48 @@ import {
   fetchMaintenanceLogs,
   fetchMaintenanceResources
 } from '../services/maintenanceWorkflowService';
-import { fetchMaintenancePayableBill } from '../services/billService';
 import { mapResourcePreview } from '../utils/resourcePreview';
 import StatusBadge from '../components/maintenance/StatusBadge';
 import ReviewModal from "../components/maintenance/ReviewModal";
 import ScheduleModal from "../components/maintenance/ScheduleModal";
 import { Edit2, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
+
+const toastConfirm = (message, confirmText = 'Đồng ý', cancelText = 'Hủy') =>
+  new Promise((resolve) => {
+    const id = toast.custom(
+      (t) => (
+        <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-4 w-[340px]">
+          <p className="text-sm text-gray-800 font-medium">{message}</p>
+          <div className="mt-3 flex justify-end gap-2">
+            <button
+              type="button"
+              className="px-3 py-1.5 text-sm rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50"
+              onClick={() => {
+                toast.dismiss(t.id);
+                resolve(false);
+              }}
+            >
+              {cancelText}
+            </button>
+            <button
+              type="button"
+              className="px-3 py-1.5 text-sm rounded-md bg-blue-600 text-white hover:bg-blue-700"
+              onClick={() => {
+                toast.dismiss(t.id);
+                resolve(true);
+              }}
+            >
+              {confirmText}
+            </button>
+          </div>
+        </div>
+      ),
+      { id: `confirm-${Date.now()}`, duration: Infinity }
+    );
+
+    return id;
+  });
 
 const QUOTATION_STATUS_MAP = {
   DRAFT: 'Nháp',
@@ -82,8 +117,6 @@ export default function MaintenanceDetail() {
   const [counterNote, setCounterNote] = useState('');
   const [quotationActionLoading, setQuotationActionLoading] = useState(false);
   const [actingQuotationId, setActingQuotationId] = useState(null);
-  const [payableBill, setPayableBill] = useState(null);
-  const [payableBillLoading, setPayableBillLoading] = useState(false);
   // Schedule action loading states
   const [scheduleActionLoading, setScheduleActionLoading] = useState(false);
   const [actingScheduleId, setActingScheduleId] = useState(null);
@@ -102,26 +135,6 @@ export default function MaintenanceDetail() {
 
       const requestData = reqRes.result;
       setRequest(requestData);
-
-      if (requestData?.scope === 'PRIVATE' && requestData?.requestStatus === 'RESIDENT_ACCEPTED') {
-        setPayableBillLoading(true);
-        try {
-          const billRes = await fetchMaintenancePayableBill(id);
-          if (billRes.code === 200) {
-            setPayableBill(billRes.result || null);
-          } else {
-            setPayableBill(null);
-          }
-        } catch (billErr) {
-          setPayableBill(null);
-          console.error('Cannot load payable bill for maintenance request', billErr);
-        } finally {
-          setPayableBillLoading(false);
-        }
-      } else {
-        setPayableBill(null);
-        setPayableBillLoading(false);
-      }
 
       if (requestData?.scope === 'PUBLIC') {
         // Public requests in resident view are status-only.
@@ -156,15 +169,16 @@ export default function MaintenanceDetail() {
   };
 
   const handleCancel = async () => {
-    if (window.confirm('Bạn có chắc chắn muốn hủy yêu cầu này?')) {
-      try {
-        const res = await cancelMaintenanceRequest(id, 'Hủy bởi cư dân');
-        if (res.code === 200) {
-          loadAllData();
-        }
-      } catch (err) {
-        toast.error('Có lỗi xảy ra khi hủy yêu cầu');
+    const confirmed = await toastConfirm('Bạn có chắc chắn muốn hủy yêu cầu này?');
+    if (!confirmed) return;
+
+    try {
+      const res = await cancelMaintenanceRequest(id, 'Hủy bởi cư dân');
+      if (res.code === 200) {
+        loadAllData();
       }
+    } catch (err) {
+      toast.error('Có lỗi xảy ra khi hủy yêu cầu');
     }
   };
 
@@ -173,7 +187,8 @@ export default function MaintenanceDetail() {
       ? 'Bạn xác nhận đồng ý báo giá này?'
       : 'Bạn xác nhận từ chối báo giá này?';
 
-    if (!window.confirm(message)) return;
+    const confirmed = await toastConfirm(message, 'Xác nhận', 'Hủy');
+    if (!confirmed) return;
 
     setQuotationActionLoading(true);
     setActingQuotationId(qId);
@@ -196,7 +211,10 @@ export default function MaintenanceDetail() {
       'REJECT': 'Bạn xác nhận từ chối lịch này?'
     };
 
-    if (confirmMessages[action] && !window.confirm(confirmMessages[action])) return;
+    if (confirmMessages[action]) {
+      const confirmed = await toastConfirm(confirmMessages[action], 'Xác nhận', 'Hủy');
+      if (!confirmed) return;
+    }
 
     setScheduleActionLoading(true);
     setActingScheduleId(sId);
@@ -413,41 +431,6 @@ export default function MaintenanceDetail() {
                   >
                     Nghiệm thu ngay
                   </button>
-                </div>
-              )}
-
-              {!isPublicViewOnly && request.requestStatus === 'RESIDENT_ACCEPTED' && (
-                <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-6 shadow-sm mb-8">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white">
-                      <DollarSign size={20} />
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-indigo-900">Thanh toán trực tuyến</h3>
-                      <p className="text-xs text-indigo-600 font-medium">Yêu cầu đã nghiệm thu và đánh giá xong. Bạn có thể thanh toán online.</p>
-                    </div>
-                  </div>
-
-                  {payableBillLoading && (
-                    <p className="text-sm text-indigo-700 font-medium">Đang kiểm tra hóa đơn liên quan...</p>
-                  )}
-
-                  {!payableBillLoading && payableBill && payableBill.status !== 'PAID' && (
-                    <button
-                      onClick={() => navigate(`/payment/${payableBill.id}?maintenanceRequestId=${id}&maintenanceRequestCode=${encodeURIComponent(request.code || '')}`)}
-                      className="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold text-sm shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all active:scale-95"
-                    >
-                      Thanh toán online ngay
-                    </button>
-                  )}
-
-                  {!payableBillLoading && payableBill?.status === 'PAID' && (
-                    <p className="text-sm font-bold text-green-700">Yêu cầu này đã được thanh toán.</p>
-                  )}
-
-                  {!payableBillLoading && !payableBill && (
-                    <p className="text-sm text-amber-700 font-medium">Hóa đơn đang được đồng bộ, vui lòng thử lại sau ít phút.</p>
-                  )}
                 </div>
               )}
 

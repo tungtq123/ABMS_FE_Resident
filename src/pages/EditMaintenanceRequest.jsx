@@ -13,7 +13,7 @@ import {
   Save
 } from 'lucide-react';
 import { fetchMaintenanceRequestDetail, updateMaintenanceRequest } from '../services/maintenanceRequestService';
-import AlertModal from '../components/common/AlertModal';
+import toast from 'react-hot-toast';
 
 export default function EditMaintenanceRequest() {
   const { id } = useParams();
@@ -28,14 +28,6 @@ export default function EditMaintenanceRequest() {
     priority: 'NORMAL',
     preferredTime: '',
   });
-
-  const [alertConfig, setAlertConfig] = useState({ isOpen: false, title: '', message: '', type: 'info' });
-
-  const showAlert = (title, message, type = 'info') => {
-    setAlertConfig({ isOpen: true, title, message, type });
-  };
-
-  const closeAlert = () => setAlertConfig(prev => ({ ...prev, isOpen: false }));
 
   useEffect(() => {
     loadRequest();
@@ -57,7 +49,7 @@ export default function EditMaintenanceRequest() {
       }
     } catch (err) {
       console.error(err);
-      showAlert('Lỗi tải dữ liệu', 'Không thể tải thông tin yêu cầu', 'error');
+      toast.error('Không thể tải thông tin yêu cầu');
     } finally {
       setLoading(false);
     }
@@ -78,14 +70,14 @@ export default function EditMaintenanceRequest() {
       const response = await updateMaintenanceRequest(id, formData);
       if (response.code === 200) {
         // Lưu xong reload danh sách và về trang detail
-        showAlert('Thành công', 'Đã lưu thông tin yên cầu', 'success');
+        toast.success('Đã lưu thông tin yêu cầu');
         setTimeout(() => navigate(`/maintenance/${id}`), 1500);
       } else {
-        showAlert('Cập nhật thất bại', response.message || 'Có lỗi xảy ra khi cập nhật', 'error');
+        toast.error(response.message || 'Có lỗi xảy ra khi cập nhật');
       }
     } catch (err) {
       console.error(err);
-      showAlert('Lỗi kết nối', 'Đã xảy ra lỗi khi kết nối máy chủ', 'error');
+      toast.error('Đã xảy ra lỗi khi kết nối máy chủ');
     } finally {
       setSubmitting(false);
     }
@@ -102,13 +94,6 @@ export default function EditMaintenanceRequest() {
 
   return (
     <div className="min-h-screen bg-gray-50/50 pb-12">
-      <AlertModal
-        isOpen={alertConfig.isOpen}
-        onClose={closeAlert}
-        title={alertConfig.title}
-        message={alertConfig.message}
-        type={alertConfig.type}
-      />
       {/* Header */}
       <div className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-6 py-4 flex items-center gap-4">

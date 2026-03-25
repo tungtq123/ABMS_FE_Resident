@@ -19,7 +19,7 @@ import { getBuildingByResidentEmail } from '../services/buildingApi';
 import { uploadFile } from '../services/fileService';
 import { addMaintenanceResource } from '../services/maintenanceWorkflowService';
 import { useAuth } from '../context/AuthContext';
-import AlertModal from '../components/common/AlertModal';
+import toast from 'react-hot-toast';
 
 export default function CreateMaintenanceRequest() {
   const navigate = useNavigate();
@@ -113,14 +113,6 @@ export default function CreateMaintenanceRequest() {
     };
   }, []);
 
-  const [alertConfig, setAlertConfig] = useState({ isOpen: false, title: '', message: '', type: 'info' });
-
-  const showAlert = (title, message, type = 'info') => {
-    setAlertConfig({ isOpen: true, title, message, type });
-  };
-
-  const closeAlert = () => setAlertConfig(prev => ({ ...prev, isOpen: false }));
-
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     if (name === 'scope') {
@@ -213,11 +205,11 @@ export default function CreateMaintenanceRequest() {
 
         navigate(`/maintenance/${response.result.id}`);
       } else {
-        showAlert('Tạo thất bại', response.message || 'Có lỗi xảy ra khi tạo yêu cầu', 'error');
+        toast.error(response.message || 'Tạo yêu cầu thất bại');
       }
     } catch (err) {
       console.error(err);
-      showAlert('Lỗi kết nối', 'Đã xảy ra lỗi khi kết nối máy chủ', 'error');
+      toast.error('Đã xảy ra lỗi khi kết nối máy chủ');
     } finally {
       setLoading(false);
     }
@@ -225,13 +217,6 @@ export default function CreateMaintenanceRequest() {
 
   return (
     <div className="min-h-screen bg-gray-50/50 pb-12">
-      <AlertModal
-        isOpen={alertConfig.isOpen}
-        onClose={closeAlert}
-        title={alertConfig.title}
-        message={alertConfig.message}
-        type={alertConfig.type}
-      />
       {/* Header */}
       <div className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-6 py-4 flex items-center gap-4">
