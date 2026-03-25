@@ -7,6 +7,7 @@ import Dashboard from "../pages/Dashboard";
 import MaintenanceList from "../pages/MaintenanceList";
 import MaintenanceDetail from "../pages/MaintenanceDetail";
 import CreateMaintenanceRequest from "../pages/CreateMaintenanceRequest";
+import MeterReadingList from "../pages/MeterReadingList";
 import EditMaintenanceRequest from "../pages/EditMaintenanceRequest";
 import RouteErrorBoundary from "../components/common/RouteErrorBoundary";
 import BuildingList from "../pages/building/BuildingList";
@@ -36,6 +37,7 @@ const AppRouter = () => {
         { path: "bills/:billId", element: <BillDetail /> },
         { path: "payment/bill-list", element: <BillList /> },
         { path: "transactions", element: <TransactionHistory /> },
+        { path: "meter-readings", element: <MeterReadingList /> },
         { path: "maintenance", element: <MaintenanceList /> },
         { path: "maintenance/create", element: <CreateMaintenanceRequest /> },
         { path: "maintenance/edit/:id", element: <EditMaintenanceRequest /> },
