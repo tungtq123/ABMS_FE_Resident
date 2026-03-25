@@ -6,6 +6,7 @@ import {
   Wrench,
   MessageSquare,
   Building2,
+  Gauge,
 } from "lucide-react";
 
 export const residentNav  = [
@@ -24,6 +25,11 @@ export const residentNav  = [
     label: "Lịch sử giao dịch",
     icon: CreditCard,
     path: "transactions",
+  },
+  {
+    label: "Chỉ số dịch vụ",
+    icon: Gauge,
+    path: "/meter-readings",
   },
   {
     label: "Thông báo",
